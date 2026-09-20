@@ -1,9 +1,28 @@
 baseURL = 'https://lucasjournal.com.br/'
 locale = 'pt-br'
 title = 'Lucas Journal'
-theme = 'PaperMod'
+theme = 'hextra'
 
 [params]
-  subtitle = "Notas de um padawan de computação"
-  mainSections = ["posts"]
-  disableSpecial1stPost = true
+  description = "Notas de um padawan de computação"
+
+  [params.navbar]
+    displayTitle = true
+    displayLogo = false
+
+  [params.theme]
+    default = "system"
+    displayToggle = true
+
+  [params.footer]
+    enable = true
+    displayCopyright = true
+    displayPoweredBy = true
+
+  [params.blog.list]
+    sortBy = "date"
+    sortOrder = "desc"
+    displayTags = true
+
+  [params.blog.article]
+    displayPagination = true

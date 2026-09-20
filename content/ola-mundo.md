@@ -1,7 +1,8 @@
 +++
 date = '2026-09-20T17:04:49-03:00'
-draft = false 
+draft = false
 title = 'Olá, Mundo!'
+type = 'blog'
 +++
 
 Este é o meu primeiro post do meu blog e o nome do primeiro post não podia ser outro! Não estou acostumado a escrever, portanto será um desafio e tanto.
