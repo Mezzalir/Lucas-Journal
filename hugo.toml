@@ -5,3 +5,5 @@ theme = 'PaperMod'
 
 [params]
   subtitle = "Notas de um padawan de computação"
+  mainSections = ["posts"]
+  disableSpecial1stPost = true
