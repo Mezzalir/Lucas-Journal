@@ -23,6 +23,11 @@
                 href="{{ .RelPermalink }}"
               >{{ .Title }}</a>
             </h3>
+            {{ if site.Params.blog.list.displayTags }}
+              <div class="hx:text-sm hx:leading-7 hx:mt-1">
+                {{ partial "tags.html" (dict "context" .) }}
+              </div>
+            {{ end }}
           </div>
         {{ end -}}
 
