@@ -15,24 +15,26 @@
         {{- $pages := partial "utils/sort-pages" (dict "page" . "by" site.Params.blog.list.sortBy "order" site.Params.blog.list.sortOrder) -}}
         {{- $pagerSize := site.Params.blog.list.pagerSize | default 10 -}}
         {{- $paginator := .Paginate $pages $pagerSize -}}
-        {{- $currentMonth := "" -}}
-        {{- range $paginator.Pages }}
-          {{- $monthKey := .Date.Format "2006-01" -}}
-          <div class="hx:mb-6" {{ if ne $monthKey $currentMonth }}id="archive-{{ $monthKey }}"{{ end }}>
-            <h3>
-              <a
-                class="hx:block hx:font-semibold hx:mt-8 hx:text-2xl hx:text-[color:hsl(var(--primary-hue),100%,50%)] hx:underline hx:underline-offset-2 hx:decoration-from-font"
-                href="{{ .RelPermalink }}"
-              >{{ .Title }}</a>
-            </h3>
-            {{ if site.Params.blog.list.displayTags }}
-              <div class="hx:text-sm hx:leading-7 hx:mt-1">
-                {{ partial "tags.html" (dict "context" .) }}
-              </div>
-            {{ end }}
-          </div>
-          {{- $currentMonth = $monthKey -}}
-        {{ end -}}
+        {{- $archiveGroups := $paginator.Pages.GroupByDate "2006 - January" "desc" -}}
+        {{- range $archiveGroups }}
+          {{- $monthKey := (index .Pages 0).Date.Format "2006-01" }}
+          <h2 class="hx:mt-8 hx:mb-4 hx:text-2xl hx:font-bold hx:text-slate-900 hx:dark:text-slate-100" id="archive-{{ $monthKey }}">{{ .Key }}</h2>
+          {{- range .Pages }}
+            <div class="hx:mb-6 post-card">
+              <h3>
+                <a
+                  class="hx:block hx:font-semibold hx:text-2xl hx:text-[color:hsl(var(--primary-hue),100%,50%)] hx:underline hx:underline-offset-2 hx:decoration-from-font"
+                  href="{{ .RelPermalink }}"
+                >{{ .Title }}</a>
+              </h3>
+              {{ if site.Params.blog.list.displayTags }}
+                <div class="hx:text-sm hx:leading-7 hx:mt-1">
+                  {{ partial "tags.html" (dict "context" .) }}
+                </div>
+              {{ end }}
+            </div>
+          {{- end }}
+        {{- end }}
 
         {{- if gt $paginator.TotalPages 1 -}}
           {{ partial "components/blog-pager.html" $paginator }}
@@ -41,7 +43,6 @@
       </main>
     </article>
     {{ if .IsHome }}
-      {{- $archiveGroups := $paginator.Pages.GroupByDate "2006 - January" "desc" -}}
       <nav class="hextra-toc hx:order-last hx:hidden hx:w-64 hx:shrink-0 hx:xl:block hx:print:hidden hx:px-4" aria-label="Arquivo">
         <div class="hextra-scrollbar hx:sticky hx:top-[var(--hextra-navbar-height)] hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm hx:max-h-[calc(100vh-var(--hextra-navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">
           {{- with $archiveGroups }}

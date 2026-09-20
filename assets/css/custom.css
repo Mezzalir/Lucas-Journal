@@ -1,0 +1,11 @@
+.post-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  background: #ffffff;
+}
+
+:root.dark .post-card {
+  border-color: #262626;
+  background: #171717;
+}
