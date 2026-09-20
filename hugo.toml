@@ -1,6 +1,6 @@
 baseURL = 'https://lucasjournal.com.br/'
 locale = 'pt-br'
-title = 'Lucas Journal'
+title = 'Lucas-Journal'
 theme = 'hextra'
 
 [[menu.main]]
