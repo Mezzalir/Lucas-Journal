@@ -5,9 +5,9 @@ title = 'Olá, Mundo!'
 type = 'blog'
 +++
 
-Este é o meu primeiro post do meu blog e o nome do primeiro post não podia ser outro! Não estou acostumado a escrever, portanto será um desafio e tanto.
+Este é o meu primeiro post do meu blog e o nome não poderia ser outro! Não estou acostumado a escrever, portanto será um desafio e tanto expressar minhas ideias.
 
-A ideia deste blog é praticar a escrita e anotar tudo o que julgo importante sobre o que estou aprendendo no mundo da computação.
+A ideia deste blog é praticar a escrita e registrar o que estou aprendendo e o que está acontecendo no mundo da computação.
 
 A inspiração para a criação de um blog e o dump de pensamentos é do Fábio Akita, que possui o blog [akitaonrails.com](https://akitaonrails.com)
 
