@@ -3,6 +3,12 @@ locale = 'pt-br'
 title = 'Lucas Journal'
 theme = 'hextra'
 
+[[menu.main]]
+  name = "Tema"
+  weight = 1
+  [menu.main.params]
+    type = "theme-toggle"
+
 [params]
   description = "Notas de um padawan de computação"
 
