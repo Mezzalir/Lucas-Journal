@@ -1,4 +1,7 @@
 baseURL = 'https://example.org/'
-locale = 'en-us'
-title = 'My New Hugo Project'
+locale = 'pt-br'
+title = 'Lucas Journal'
 theme = 'PaperMod'
+
+[params]
+  subtitle = "Notas de um padawan de computação"

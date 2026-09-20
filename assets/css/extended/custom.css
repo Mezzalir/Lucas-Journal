@@ -1,0 +1,7 @@
+.header-subtitle {
+  max-width: calc(var(--nav-width) + var(--gap) * 2);
+  margin: 0 auto;
+  padding: 0 var(--gap) 12px;
+  color: var(--secondary);
+  font-size: 14px;
+}
