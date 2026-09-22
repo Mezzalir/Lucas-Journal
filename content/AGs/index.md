@@ -10,7 +10,7 @@ tags = ['unioeste', 'otimização']
 
 Antes de conversarmos sobre algoritmos genéticos, é importante definir, de maneira breve, computabilidade e complexidade.
 
-1. Computabilidade
+_1. Computabilidade_
 
 Decidíveis: existe algoritmo que sempre para e responde corretamente.
 Indecidíveis: nenhum algoritmo resolve para toda entrada, por mais tempo que se dê. Ex.: o problema da parada.
