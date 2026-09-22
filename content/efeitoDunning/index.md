@@ -3,7 +3,7 @@ date = '2026-09-21T21:49:42-03:00'
 draft = false 
 title = 'Efeito Dunning-Kruger'
 type = 'blog'
-tag = ["psicologia", "carreira"]
+tags = ["psicologia", "carreira"]
 +++
 
 ## O efeito
