@@ -3,6 +3,7 @@ date = '2026-09-23T23:25:25-03:00'
 draft = false 
 title = 'DHH e sua palestra histórica na Rails World 2026'
 type = 'blog'
+tags = ['IA', 'Rails-ruby']
 +++
 
 Hoje, 23/09/2026, aconteceu a Rails World 2026 e, com ela, uma palestra possivelmente histórica de DHH. Ele, o criador do Ruby on Rails, subiu ao palco de uma conferência de Rails, lotada de desenvolvedores Rails, e disse que não programa mais em Rails. Praticamente invalidou todas as apresentações anteriores à dele.
