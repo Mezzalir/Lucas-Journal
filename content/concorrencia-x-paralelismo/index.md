@@ -8,9 +8,9 @@ tags = ['Arquitetura', 'História']
 
 ## Resumo
 
-_Em termos de software_, concorrência é ter várias tarefas em andamento no mesmo período, mas não necessariamente executando no mesmo instante. Elas podem se revezar no processador. No paralelismo, várias tarefas estão executando literalmente no mesmo instante, em unidades de hardware diferentes (vários núcleos, por exemplo).
+Um único núcleo roda apenas UM programa por vez. O sistema operacional alterna entre progrmas: roda um por alguns milissegundos, salva o estado, carrega o próximo. É tão rápido que parece simultâneio, mas em cada instante só um programa está usando o núcleo. Isso se chama concorrência. As tarefas se intercalam, mas não executam ao mesmo tempo. O paralelismo em nível de instrução é executar múltiplas instruções ao mesmo tempo, DO MESMO PROGRAMA.
 
-_Em termos de hardware_, a concorrência é implementada com interrupções de timer, salvamento do estado do programa e proteção de memória. O paralelismo pode ser implementado com processadores superescalares, que executam múltiplas instruções ao mesmo tempo.
+_Em termos de software_, concorrência é ter várias tarefas em andamento no mesmo período, mas não necessariamente executando no mesmo instante. Elas podem se revezar no processador. No paralelismo, várias tarefas estão executando literalmente no mesmo instante, em unidades de hardware diferentes (vários núcleos, por exemplo).
 
 ---
 
@@ -43,3 +43,9 @@ Como a troca acontece:
 Quando chega de novo a vez de A, o contexto dele é restaurado, e o programa continua exatamente de onde tinha parado, como se nada tivesse acontecido.
 
 ## Paralelismo em nível de instrução
+
+ILP é a capacidade de executar mais de uma instrução ao mesmo tempo, a partir de um único programa sequencial. O programador escreve as instruções em sequência, e o processador descobre quais delas não dependem umas das outras para executá-las juntas.
+
+### Pipeline
+
+Executar uma instrução envolve várias etapas.
