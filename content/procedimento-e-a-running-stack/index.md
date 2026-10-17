@@ -18,6 +18,8 @@ Toda ação de chamada de um procedimento envolve um ou mais dos seguintes mecan
 
 - *Alocação e desalocação de memória*: Q pode precisar alocar espaço para variáveis locais quando começa e depois liberar esse espaço antes de retornar.
 
+---
+
 # Run-Time stack 
   
 A estrutura de dados Stack, que é feita a partir do LIFO (Last-in, First-out), é usado para chamada de procedimentos. Quando o procedimento P chama o procedimento Q, ele fica temporariamente suspenso e só será finalizado quando Q e todas as suas chamadas subsequentes forem finalizas. Enquanto Q está rodando, só ele vai precisar alocar novo espaço para suas variáveis locais ou  preparar uma chamada a outro procedimento. Quando Q retorna, qualquer espaço local que ele alocou pode ser liberado.
