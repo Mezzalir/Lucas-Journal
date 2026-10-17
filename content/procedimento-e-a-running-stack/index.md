@@ -54,3 +54,11 @@ Quando P chama o procedimento Q, o código de P precisa copiar os argumentos par
 No x86_64, até seis argumentos inteiros (isto é, inteiros e ponteiros) podem ser passados por registradores. Os registradores são usados numa ordem definida, e o nome usado para cada registrador depende do tamanho do tipo de dado que está sendo passado. Argumentos são atribuídos a esses registradores de acordo com sua ordem na lista de argumento. Argumentos menores que 64 bits podem ser acessados usando a secão apropriada do registrador de 64 bits. 
 
 *Quando uma função possui mais de 6 argumentos inteiros, os outros são passados pela stack.*
+
+
+![Função proc com 8 argumentos de tipos diferentes e o assembly gerado (CS:APP, Figura 3.29)](02.png)
+
+
+
+---
+*Trechos extraídos do livro CSAPP*
