@@ -20,7 +20,9 @@ Toda ação de chamada de um procedimento envolve um ou mais dos seguintes mecan
 
 ---
 
+
 # Run-Time stack 
+
   
 A estrutura de dados Stack, que é feita a partir do LIFO (Last-in, First-out), é usado para chamada de procedimentos. Quando o procedimento P chama o procedimento Q, ele fica temporariamente suspenso e só será finalizado quando Q e todas as suas chamadas subsequentes forem finalizas. Enquanto Q está rodando, só ele vai precisar alocar novo espaço para suas variáveis locais ou  preparar uma chamada a outro procedimento. Quando Q retorna, qualquer espaço local que ele alocou pode ser liberado.
 
@@ -40,12 +42,15 @@ Para economizar espaço e tempo, os procedimentos x86_64 alocam apenas as partes
 
 O compilador tenta manter as variáveis locais em registradores, por que é mais rápido que acessar a memória. Elas só vão para o stack frame quando não tem outro jeito.
 
+
 # Control transfer 
+
 
 Passar o controle da função P para a função Q envolve atualizar o Programar Counter (PC) para o endereço inicial do código de Q. Porém, quando Q retornar, o processador precisa ter algum registro do local onde deve continuar a execução de P. Nas máquinas x86_64, essa informação é registrada chamando o procedimento Q com a instrução call Q. Essa instrução empilha um endereço A e coloca no PC o início de Q. O endereço empilhado A é chamado de endereço de retorno e é calculado como o endereço da instrução que vem logo depois da instrução call. A instrução correspondente, ret, desempilha um endereço A e coloca a no PC
 
 
 # Data transfer
+
 
 Chamadas de procedimento podem envolver passagem de dados como argumentos e também retorno de dados, caso haja. Nas máquinas x86_64, a maioria dessas passagens de dado *from and to* é feita através dos registradores.
 
