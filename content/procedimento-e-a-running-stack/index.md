@@ -66,7 +66,7 @@ No x86_64, até seis argumentos inteiros (isto é, inteiros e ponteiros) podem s
 
 # Armazenamento local na Stack 
 
-Normalmente,o compilador guarda variáveis locais em registradores, que são mais rápidos. Como visto anteriormente, até 6 argumentos. Após isso é usado a stack. Porém, há necessidade também de acessar memória para certos casos: 
+Normalmente, o compilador guarda variáveis locais em registradores, que são mais rápidos. Como visto anteriormente, até 6 argumentos. Após isso é usado a stack. Porém, há necessidade também de acessar memória para certos casos: 
 
 - Não há registradores suficientes para armazenar os dados locais do procedimento 
 
@@ -75,7 +75,7 @@ Normalmente,o compilador guarda variáveis locais em registradores, que são mai
 - Variáveis locais do tipo array e structs precisam ser acessados via referência, portanto necessitam da memória.
 
 
-Tipicamente, um procedimento aloca espaço no stack frame decrementando o stack pointer. Há uma porção do stack frame dedicada para as variáveis locais, chamado "Local variables". O espaço é liberado somando o mesmo valor de volta ao final. Exemplo: Um prodecimento caller que subtrai 16 do registrador de pilha RSP para guardar duas variáveis de 8 bytes. 
+Tipicamente, um procedimento aloca espaço no stack frame decrementando o stack pointer. Há uma porção do stack frame dedicada para as variáveis locais, chamado "Local variables". O espaço é liberado somando o mesmo valor de volta ao final. Exemplo: Um procedimento caller que subtrai 16 do registrador de pilha RSP para guardar duas variáveis de 8 bytes. 
 
 O ponto principal é que alocar e liberar memória da stack custa uma subtração e uma soma do registrador de pilha. O espaço existe só enquanto a função está executando e some sozinho quando ela termina.
 
@@ -83,7 +83,7 @@ Vale lembrar: Em C, toda passagem é por valor. Passagem por referência é na v
 
 # Armazenamento local em registradores 
 
-Essa seção trata de um problema que aparece quando um procedimento chama outra: existe só um conjunto de registradores, e os dois procedimentos usam os mesmos.
+Essa seção trata de um problema que aparece quando um procedimento chama outro: existe só um conjunto de registradores, e os dois procedimentos usam os mesmos.
 
 Por convenção, registradores rbx, rbp, e r12-r15 são classificados como *callee-saved* registers. Quando o procedimento P chama o procedimento Q, Q DEVE preservar os valores desses registradores, assegurando que eles possuem os mesmos valores quando Q retornar para P, quando P chamou Q
 
