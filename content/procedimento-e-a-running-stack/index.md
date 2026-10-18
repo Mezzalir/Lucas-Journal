@@ -21,7 +21,7 @@ Toda ação de chamada de um procedimento envolve um ou mais dos seguintes mecan
 ---
 
 
-# Run-Time stack 
+## Run-Time stack 
 
   
 A estrutura de dados Stack, que é feita a partir do LIFO (Last-in, First-out), é usado para chamada de procedimentos. Quando o procedimento P chama o procedimento Q, ele fica temporariamente suspenso e só será finalizado quando Q e todas as suas chamadas subsequentes forem finalizadas. Enquanto Q está rodando, só ele vai precisar alocar novo espaço para suas variáveis locais ou  preparar uma chamada a outro procedimento. Quando Q retorna, qualquer espaço local que ele alocou pode ser liberado.
@@ -43,14 +43,14 @@ Para economizar espaço e tempo, os procedimentos x86_64 alocam apenas as partes
 O compilador tenta manter as variáveis locais em registradores, porque é mais rápido que acessar a memória. Elas só vão para o stack frame quando não tem outro jeito.
 
 
-# Control transfer 
+## Control transfer 
 
 
 Passar o controle da função P para a função Q envolve atualizar o Program Counter (PC) para o endereço inicial do código de Q. Porém, quando Q retornar, o processador precisa ter algum registro do local onde deve continuar a execução de P. Nas máquinas x86_64, essa informação é registrada chamando o procedimento Q com a instrução call Q. Essa instrução empilha um endereço A e coloca no PC o início de Q. O endereço empilhado A é chamado de endereço de retorno e é calculado como o endereço da instrução que vem logo depois da instrução call. A instrução correspondente, ret, desempilha um endereço A e coloca A no PC
 
 
 
-# Data transfer
+## Data transfer
 
 
 
@@ -72,7 +72,7 @@ No x86_64, até seis argumentos inteiros (isto é, inteiros e ponteiros) podem s
 
 
 
-# Armazenamento local na Stack 
+## Armazenamento local na Stack 
 
 Normalmente, o compilador guarda variáveis locais em registradores, que são mais rápidos. Como visto anteriormente, até 6 argumentos. Após isso é usado a stack. Porém, há necessidade também de acessar memória para certos casos: 
 
@@ -91,7 +91,7 @@ Vale lembrar: Em C, toda passagem é por valor. Passagem por referência é na v
 
 
 
-# Armazenamento local em registradores 
+## Armazenamento local em registradores 
 
 
 Essa seção trata de um problema que aparece quando um procedimento chama outro: existe só um conjunto de registradores, e os dois procedimentos usam os mesmos.
