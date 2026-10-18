@@ -49,7 +49,9 @@ O compilador tenta manter as variáveis locais em registradores, porque é mais 
 Passar o controle da função P para a função Q envolve atualizar o Program Counter (PC) para o endereço inicial do código de Q. Porém, quando Q retornar, o processador precisa ter algum registro do local onde deve continuar a execução de P. Nas máquinas x86_64, essa informação é registrada chamando o procedimento Q com a instrução call Q. Essa instrução empilha um endereço A e coloca no PC o início de Q. O endereço empilhado A é chamado de endereço de retorno e é calculado como o endereço da instrução que vem logo depois da instrução call. A instrução correspondente, ret, desempilha um endereço A e coloca A no PC
 
 
+
 # Data transfer
+
 
 
 Chamadas de procedimento podem envolver passagem de dados como argumentos e também retorno de dados, caso haja. Nas máquinas x86_64, a maioria dessas passagens de dado *from and to* é feita através dos registradores.
@@ -61,7 +63,13 @@ No x86_64, até seis argumentos inteiros (isto é, inteiros e ponteiros) podem s
 *Quando uma função possui mais de 6 argumentos inteiros, os outros são passados pela stack.*
 
 
+
+
 ![Função proc com 8 argumentos de tipos diferentes e o assembly gerado (CS:APP, Figura 3.29)](02.png)
+
+
+
+
 
 
 # Armazenamento local na Stack 
@@ -81,7 +89,10 @@ O ponto principal é que alocar e liberar memória da stack custa uma subtraçã
 
 Vale lembrar: Em C, toda passagem é por valor. Passagem por referência é na verdade passar um ponteiro por valor
 
+
+
 # Armazenamento local em registradores 
+
 
 Essa seção trata de um problema que aparece quando um procedimento chama outro: existe só um conjunto de registradores, e os dois procedimentos usam os mesmos.
 
