@@ -10,7 +10,7 @@ Procedimentos são abstrações em software. Promovem uma maneira de empacotar c
 
 Toda ação de chamada de um procedimento envolve um ou mais dos seguintes mecanismos:
 
-*(Suponha que o procedimento P chama o procedimento Q, e que Q então executa e retorna para P)*
+*(Para o restante do texto, suponha que o procedimento P chama o procedimento Q, e que Q então executa e retorna para P)*
 
 - *Passagem de controle*: O contador de programa (PC) deve receber o endereço inicial do código de Q na entrada. No retorno, deve receber o endereço da instrução de P que vem logo após a chamada de Q
 
@@ -64,6 +64,32 @@ No x86_64, até seis argumentos inteiros (isto é, inteiros e ponteiros) podem s
 ![Função proc com 8 argumentos de tipos diferentes e o assembly gerado (CS:APP, Figura 3.29)](02.png)
 
 
+# Armazenamento local na Stack 
+
+Normalmente,o compilador guarda variáveis locais em registradores, que são mais rápidos. Como visto anteriormente, até 6 argumentos. Após isso é usado a stack. Porém, há necessidade também de acessar memória para certos casos: 
+
+- Não há registradores suficientes para armazenar os dados locais do procedimento 
+
+- É usado o operador '&' em uma variável local e, portanto, é necessário trabalhar com endereço. Exemplo: &variavel, essa variável precisa estar na memória, porque o endereço vai ser passado para outra função
+
+- Variáveis locais do tipo array e structs precisam ser acessados via referência, portanto necessitam da memória.
+
+
+Tipicamente, um procedimento aloca espaço no stack frame decrementando o stack pointer. Há uma porção do stack frame dedicada para as variáveis locais, chamado "Local variables". O espaço é liberado somando o mesmo valor de volta ao final. Exemplo: Um prodecimento caller que subtrai 16 do registrador de pilha RSP para guardar duas variáveis de 8 bytes. 
+
+O ponto principal é que alocar e liberar memória da stack custa uma subtração e uma soma do registrador de pilha. O espaço existe só enquanto a função está executando e some sozinho quando ela termina.
+
+Vale lembrar: Em C, toda passagem é por valor. Passagem por referência é na verdade passar um ponteiro por valor
+
+# Armazenamento local em registradores 
+
+Essa seção trata de um problema que aparece quando um procedimento chama outra: existe só um conjunto de registradores, e os dois procedimentos usam os mesmos.
+
+Por convenção, registradores rbx, rbp, e r12-r15 são classificados como *callee-saved* registers. Quando o procedimento P chama o procedimento Q, Q DEVE preservar os valores desses registradores, assegurando que eles possuem os mesmos valores quando Q retornar para P, quando P chamou Q
+
+Existem duas formas de Q (o procedimento que foi chamado após P), de preservar esses registradores. O primeiro é simplesmente não alterando esses registradores. O segundo é fazendo um push na stack e depois um pop do valor antigo, antes do retorno. Ao fazer um push, é criado a parte dos registradores salvos do stack-frame 
+
+Todos os outros registradores, tirando o rsp, podem ser alterados livremente pelos procedimentos. 
 
 ---
 *Trechos extraídos do livro CSAPP*
