@@ -129,3 +129,7 @@ movq    %rax, 16(%rdi)          # Armazena em r->p
 ```
 
 Como esses exemplos mostram, a seleção dos diferentes campos de uma struct é resolvida inteiramente em tempo de compilação. O código de máquina não contém nenhuma informação sobre as declarações dos campos nem sobre os nomes deles.
+
+---
+
+*Trechos retirados do livro CSAPP e traduzidos pelo Claude*
