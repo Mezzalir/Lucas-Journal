@@ -65,6 +65,8 @@ Em 1966, Michael J. Flynn propôs uma forma de classificar arquiteturas de compu
 
 O ILP (Instruction-Level Parallelism) é a capacidade de executar mais de uma instrução ao mesmo tempo, a partir de um único programa sequencial. O programador escreve as instruções em sequência, e o processador descobre quais delas não dependem umas das outras para executá-las juntas.
 
+Ou seja, no paralelismo em nível de instrução, tudo acontece dentro do hardware. O programa continua sendo escrito de forma sequencial, sem threads e sem nenhuma mudança no código. Para o programador, esse paralelismo é invisível.
+
 ### Pipelining
 
 Executar uma instrução envolve várias etapas. Em um processador RISC clássico, são cinco:
