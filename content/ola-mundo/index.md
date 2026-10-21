@@ -8,7 +8,7 @@ tags = ['unioeste']
 
 Este é o meu primeiro post do meu blog e o título não poderia ser outro!
 
-A ideia deste blog é praticar a escrita e registrar o que estou aprendendo e o que está acontecendo no mundo da computação.
+Este journal serve para documentar os meus estudos. A ideia é salvar aqui os assuntos mais importantes que estou aprendendo, para que eu possa voltar a eles quando precisar lembrar, e também registrar o que está acontecendo no mundo da computação.
 
 A inspiração para a criação de um blog e o dump de pensamentos é do Fábio Akita, que possui o blog [akitaonrails.com](https://akitaonrails.com)
 
