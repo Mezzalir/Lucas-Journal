@@ -32,3 +32,9 @@ theme = 'hextra'
 
   [params.blog.article]
     displayPagination = true
+
+[markup.goldmark.extensions.passthrough]
+  enable = true
+  [markup.goldmark.extensions.passthrough.delimiters]
+    block = [['\[', '\]'], ['$$', '$$']]
+    inline = [['\(', '\)']]
