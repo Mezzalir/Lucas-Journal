@@ -1,3 +1,18 @@
+@font-face {
+  font-family: "Iosevka";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/iosevka-latin-400-normal.woff2") format("woff2");
+}
+
+@layer theme {
+  :root {
+    --hx-default-font-family: "Iosevka", monospace;
+    --hx-default-mono-font-family: "Iosevka", monospace;
+  }
+}
+
 :root {
   --hx-color-white: #faf8f5;
   --hx-color-dark: #1c1917;
