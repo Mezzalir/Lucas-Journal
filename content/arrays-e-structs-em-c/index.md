@@ -3,7 +3,7 @@ date = '2026-10-18T15:03:43-03:00'
 draft = false
 title = 'Arrays e Structs em C'
 type = 'blog'
-tags = ['Arquitetura', 'Assembly', 'Memória', 'CSAPP']
+tags = ['Arquitetura', 'Assembly', 'Memória', 'CSAPP', 'C']
 +++
 
 Arrays em C são uma forma de agrupar dados escalares em tipos de dados maiores. C usa uma implementação de arrays particularmente simples, então a tradução para código de máquina é bem direta. Uma característica incomum de C é que podemos gerar ponteiros para elementos dentro de arrays e fazer aritmética com esses ponteiros. Essas operações são traduzidas em cálculos de endereço no código de máquina.

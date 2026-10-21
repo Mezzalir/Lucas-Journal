@@ -3,7 +3,7 @@ date = '2026-10-18T17:02:29-03:00'
 draft = false
 title = 'Entendendo ponteiros'
 type = 'blog'
-tags = ['Arquitetura', 'Assembly', 'Memória', 'CSAPP']
+tags = ['Arquitetura', 'Assembly', 'Memória', 'CSAPP', 'C']
 +++
 
 Ponteiros são uma característica central da linguagem C. Eles servem como uma forma uniforme de gerar referências a elementos dentro de diferentes estruturas de dados. Ponteiros são uma fonte de confusão para programadores iniciantes, mas os conceitos por trás deles são bem simples. Aqui destacamos alguns princípios importantes dos ponteiros e como eles são mapeados para código de máquina.
