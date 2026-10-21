@@ -19,13 +19,9 @@ Paralelismo é executar coisas literalmente no mesmo instante, em partes diferen
 - **Paralelismo de dados (data parallelism):** a mesma operação é aplicada a vários dados ao mesmo tempo. Por exemplo, somar dois vetores grandes dividindo os elementos entre os núcleos.
 - **Paralelismo de tarefas (task parallelism):** tarefas diferentes executam ao mesmo tempo, cada uma em um núcleo, trabalhando sobre os mesmos dados ou não.
 
-Durante décadas, os programas ficaram mais rápidos sem esforço do programador, graças ao aumento da frequência do clock. Quando esse caminho esbarrou no consumo de energia, em 2004, a saída foi colocar vários núcleos no mesmo processador. Desde então, para ficar mais rápido, um programa precisa ser escrito para rodar em paralelo, e a lei de Amdahl mostra até onde vai esse ganho.
-
----
+Durante décadas, os programas ficaram mais rápidos sem esforço do programador, graças ao aumento da frequência do clock. Quando esse caminho esbarrou no consumo de energia, em 2004, a saída foi colocar vários núcleos no mesmo processador. Desde então, ter vários núcleos não basta: o programador precisa escrever o código dividido em threads diferentes, para que o sistema operacional possa distribuí-las entre os núcleos. Um programa escrito de forma sequencial continua rodando normalmente, mas em um único núcleo, sem aproveitar os outros. E a lei de Amdahl mostra até onde vai o ganho de paralelizar.
 
 Vamos entender um pouco sobre concorrência e paralelismo e a diferença entre os dois. Analisando a evolução dos computadores, podemos aprender mais sobre o assunto.
-
-Este post será atualizado conforme os estudos avançarem.
 
 ## Antes do time-sharing: processamento em lote
 
