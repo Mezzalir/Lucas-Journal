@@ -12,8 +12,6 @@ Este journal serve para documentar os meus estudos. A ideia é salvar aqui os as
 
 A inspiração para a criação de um blog e o dump de pensamentos é do Fábio Akita, que possui o blog [akitaonrails.com](https://akitaonrails.com)
 
-Também será minha primeira experiênia com markdown!
-
 ## Situação atual
 
 Estou no segundo ano de Ciência da Computação da Unioeste. Ainda não sei qual área gostaria de trabalhar. Veremos o que o futuro nos reserva!
