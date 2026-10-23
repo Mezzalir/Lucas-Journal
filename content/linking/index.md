@@ -1,6 +1,6 @@
 +++
 date = '2026-10-22T22:59:03-03:00'
-draft = true
+draft = false
 title = 'Linking'
 type = 'blog'
 tags = ['Arquitetura', 'Sistemas Operacionais', 'Bibliotecas', 'Compiladores']
