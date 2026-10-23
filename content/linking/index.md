@@ -31,7 +31,7 @@ Os linkers têm um papel essencial no desenvolvimento de software porque permite
   - **Locais:** declarados com `static`, visíveis só dentro do próprio módulo.
   - Os globais também podem ser **fortes** (funções e variáveis inicializadas) ou **fracos** (variáveis não inicializadas), o que decide qual definição o linker escolhe quando há nomes repetidos.
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
-- **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa.
+- **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa. Como o linker lê os arquivos da esquerda para a direita, **as bibliotecas devem vir no fim do comando**, depois dos arquivos que usam as funções delas.
 
 ## O programa de exemplo
 
@@ -446,6 +446,45 @@ Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida
 - `main2.o`, o código do próprio programa;
 - `addvec.o`, vindo da `libvector.a`;
 - `printf.o` e os módulos que ele usa, vindos da `libc.a`.
+
+### Como o linker usa as bibliotecas estáticas
+
+As bibliotecas estáticas são úteis, mas também confundem muita gente por causa do jeito como o linker do Linux as usa. O linker lê os arquivos **da esquerda para a direita, na ordem em que aparecem no comando**, e vai mantendo três conjuntos:
+
+- **E:** os object files que vão entrar no executável.
+- **U:** os símbolos **não resolvidos**, que já foram usados mas ainda não têm definição.
+- **D:** os símbolos que já foram definidos pelos arquivos lidos até agora.
+
+No começo, os três estão vazios. Para cada arquivo do comando:
+
+- **Se for um object file**, o linker o coloca em E e atualiza U e D com o que ele define e usa.
+- **Se for uma biblioteca**, o linker procura dentro dela módulos que definam algum símbolo de U. Cada módulo que resolve alguma coisa entra em E, e U e D são atualizados. Ele repete isso até não encontrar mais nada útil na biblioteca. **Os módulos que não resolveram nada são descartados.**
+
+No fim, se U não estiver vazio, sobrou algum símbolo sem definição, e o linker para com um erro. Senão, ele junta e reloca os object files de E e gera o executável.
+
+O problema é que, por isso, **a ordem dos arquivos no comando importa**. Se a biblioteca vier antes do arquivo que usa as funções dela, o linker falha:
+
+```
+linux> gcc -static ./libvector.a main2.c
+/tmp/cc9XH6Rp.o: In function 'main':
+/tmp/cc9XH6Rp.o(.text+0x18): undefined reference to 'addvec'
+```
+
+Quando o linker leu a `libvector.a`, o U ainda estava vazio, porque o `main2.c` não tinha sido lido. Então nenhum módulo da biblioteca parecia útil e todos foram descartados. Quando o `main2.o` apareceu pedindo `addvec`, a biblioteca já tinha ficado para trás.
+
+A regra geral é **colocar as bibliotecas no fim do comando**. Se uma biblioteca depende de outra, a ordem entre elas também importa: quem usa vem antes de quem define. Se `foo.c` chama funções de `libx.a` e de `libz.a`, e essas chamam funções de `liby.a`, então `libx.a` e `libz.a` têm que vir antes de `liby.a`:
+
+```
+linux> gcc foo.c libx.a libz.a liby.a
+```
+
+Se a dependência for circular, a biblioteca pode ser repetida no comando. Se `foo.c` chama `libx.a`, que chama `liby.a`, que chama `libx.a` de novo:
+
+```
+linux> gcc foo.c libx.a liby.a libx.a
+```
+
+Outra saída é juntar `libx.a` e `liby.a` em uma única biblioteca.
 
 ---
 
