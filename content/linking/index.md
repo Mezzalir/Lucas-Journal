@@ -16,6 +16,17 @@ Nos primeiros computadores, o linking era feito manualmente. Nos sistemas modern
 
 Os linkers têm um papel essencial no desenvolvimento de software porque permitem a **compilação separada**. Em vez de organizar uma aplicação grande em um único arquivo-fonte gigante, é possível dividi-la em módulos menores e mais fáceis de gerenciar, que podem ser modificados e compilados separadamente. **Quando um desses módulos muda, basta recompilar só ele e refazer o linking da aplicação, sem precisar recompilar todos os outros arquivos.**
 
+## Resumo
+
+- **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
+- **Tipos de object file:**
+  - **Relocatable object file** (`.o`): gerado pelo compilador, ainda precisa ser juntado com outros para virar um programa.
+  - **Executable object file**: o programa pronto, gerado pelo linker, que pode ser carregado na memória e executado.
+  - **Shared object file** (`.so` no Linux, `.dll` no Windows): uma biblioteca que é ligada ao programa só na hora de carregar ou durante a execução.
+- **O que tem dentro de um object file:** o código de máquina (`.text`), as variáveis globais inicializadas (`.data`) e não inicializadas (`.bss`), a **tabela de símbolos** (`.symtab`) e as informações de relocação (`.rel.text`, `.rel.data`), que dizem ao linker o que corrigir.
+- **Símbolo:** o nome de uma função ou variável global (ou `static`). Variáveis locais comuns não são símbolos.
+- **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
+
 ## O programa de exemplo
 
 Ao longo do post, vamos usar como exemplo um programa formado por dois arquivos-fonte, `main.c` e `sum.c`. A função `main` inicializa um vetor de `int` e depois chama a função `sum` para somar os elementos do vetor.
@@ -152,7 +163,20 @@ Dá para ver as seções de um object file com o comando `readelf -S main.o`, a 
 
 ## Símbolos e tabelas de símbolos
 
-Cada relocatable object file tem uma tabela de símbolos com tudo o que ele define e tudo o que ele usa de fora. Para o linker, existem três tipos de símbolo:
+Um **símbolo** é um nome que aparece no nível global do código C: uma função ou uma variável global (ou `static`). No exemplo, `main`, `array` e `sum` são símbolos. Já as variáveis declaradas dentro das funções, como `val`, `i` e `s`, não são.
+
+A **tabela de símbolos** é uma lista guardada dentro do próprio `.o`, na seção `.symtab`, que diz para cada nome:
+
+- onde ele está (em qual seção e em qual posição dela);
+- quantos bytes ocupa;
+- o que ele é (função, variável...);
+- se outros arquivos podem usá-lo.
+
+Ela existe para o **linker**. Quando você junta vários `.o`, o linker usa essas tabelas para descobrir, por exemplo, que o `sum` chamado em `main.o` é o `sum` definido em `sum.o`.
+
+Para entender os tipos de símbolo, é preciso saber o que é um **módulo**: é simplesmente um arquivo do programa. Cada `.c`, depois de compilado, vira um `.o`, e cada `.o` é um módulo (o livro chama de *object module*). No exemplo, o programa tem dois módulos: `main.o` e `sum.o`. Então, quando o texto diz "definido pelo módulo", quer dizer "definido **naquele arquivo**".
+
+Para o linker, existem três tipos de símbolo, sempre olhando do ponto de vista de um módulo:
 
 - **Globais definidos pelo módulo:** funções e variáveis globais que o arquivo define e que outros arquivos podem usar. No `main.o`, são `main` e `array`.
 - **Externos:** funções e variáveis globais que o arquivo usa, mas que são definidas em outro arquivo. No `main.o`, é o `sum`.
