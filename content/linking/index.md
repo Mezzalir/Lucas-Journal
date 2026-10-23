@@ -25,7 +25,11 @@ Os linkers têm um papel essencial no desenvolvimento de software porque permite
   - **Shared object file** (`.so` no Linux, `.dll` no Windows): uma biblioteca que é ligada ao programa só na hora de carregar ou durante a execução.
 - **O que tem dentro de um object file:** o código de máquina (`.text`), as variáveis globais inicializadas (`.data`) e não inicializadas (`.bss`), a **tabela de símbolos** (`.symtab`) e as informações de relocação (`.rel.text`, `.rel.data`), que dizem ao linker o que corrigir.
 - **Carregar x executar:** **carregar** é copiar o código e os dados do executable object file do disco para a memória, preparando tudo para o programa começar. Quem faz isso é o **loader**, uma parte do sistema operacional. **Executar** é o que vem depois: o processador começa a rodar as instruções que já estão na memória, a partir da primeira instrução do programa. Ou seja, carregar é colocar o programa na memória, e executar é rodar o programa que já está lá.
-- **Símbolo:** o nome de uma função ou variável global (ou `static`). Variáveis locais comuns não são símbolos.
+- **Símbolo:** o nome de uma função ou variável global (ou `static`). Variáveis locais comuns não são símbolos. Do ponto de vista de um módulo, existem três tipos:
+  - **Globais:** definidos no módulo e visíveis para os outros (`main` e `array` em `main.o`).
+  - **Externos:** usados no módulo, mas definidos em outro (`sum` em `main.o`).
+  - **Locais:** declarados com `static`, visíveis só dentro do próprio módulo.
+  - Os globais também podem ser **fortes** (funções e variáveis inicializadas) ou **fracos** (variáveis não inicializadas), o que decide qual definição o linker escolhe quando há nomes repetidos.
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
 - **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa.
 
