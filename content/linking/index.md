@@ -6,6 +6,16 @@ type = 'blog'
 tags = ['Arquitetura', 'Sistemas Operacionais', 'Bibliotecas', 'Compiladores']
 +++
 
+*Linking* (ligação) é o processo de reunir e combinar vários pedaços de código e de dados em um único arquivo, que pode ser *carregado* (copiado) para a memória e executado. O linking pode acontecer em três momentos:
+
+- **Em tempo de compilação** (*compile time*), quando o código-fonte é traduzido para código de máquina.
+- **Em tempo de carregamento** (*load time*), quando o programa é carregado na memória e executado pelo *loader*.
+- **Em tempo de execução** (*run time*), feito pelos próprios programas enquanto rodam.
+
+Nos primeiros computadores, o linking era feito manualmente. Nos sistemas modernos, ele é feito automaticamente por programas chamados de **linkers**.
+
+Os linkers têm um papel essencial no desenvolvimento de software porque permitem a **compilação separada**. Em vez de organizar uma aplicação grande em um único arquivo-fonte gigante, é possível dividi-la em módulos menores e mais fáceis de gerenciar, que podem ser modificados e compilados separadamente. **Quando um desses módulos muda, basta recompilar só ele e refazer o linking da aplicação, sem precisar recompilar todos os outros arquivos.**
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -17,16 +27,6 @@ tags = ['Arquitetura', 'Sistemas Operacionais', 'Bibliotecas', 'Compiladores']
 - **Carregar x executar:** **carregar** é copiar o código e os dados do executable object file do disco para a memória, preparando tudo para o programa começar. Quem faz isso é o **loader**, uma parte do sistema operacional. **Executar** é o que vem depois: o processador começa a rodar as instruções que já estão na memória, a partir da primeira instrução do programa. Ou seja, carregar é colocar o programa na memória, e executar é rodar o programa que já está lá.
 - **Símbolo:** o nome de uma função ou variável global (ou `static`). Variáveis locais comuns não são símbolos.
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
-
-*Linking* (ligação) é o processo de reunir e combinar vários pedaços de código e de dados em um único arquivo, que pode ser *carregado* (copiado) para a memória e executado. O linking pode acontecer em três momentos:
-
-- **Em tempo de compilação** (*compile time*), quando o código-fonte é traduzido para código de máquina.
-- **Em tempo de carregamento** (*load time*), quando o programa é carregado na memória e executado pelo *loader*.
-- **Em tempo de execução** (*run time*), feito pelos próprios programas enquanto rodam.
-
-Nos primeiros computadores, o linking era feito manualmente. Nos sistemas modernos, ele é feito automaticamente por programas chamados de **linkers**.
-
-Os linkers têm um papel essencial no desenvolvimento de software porque permitem a **compilação separada**. Em vez de organizar uma aplicação grande em um único arquivo-fonte gigante, é possível dividi-la em módulos menores e mais fáceis de gerenciar, que podem ser modificados e compilados separadamente. **Quando um desses módulos muda, basta recompilar só ele e refazer o linking da aplicação, sem precisar recompilar todos os outros arquivos.**
 
 ## O programa de exemplo
 
