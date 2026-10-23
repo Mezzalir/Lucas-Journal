@@ -27,6 +27,7 @@ Os linkers têm um papel essencial no desenvolvimento de software porque permite
 - **Carregar x executar:** **carregar** é copiar o código e os dados do executable object file do disco para a memória, preparando tudo para o programa começar. Quem faz isso é o **loader**, uma parte do sistema operacional. **Executar** é o que vem depois: o processador começa a rodar as instruções que já estão na memória, a partir da primeira instrução do programa. Ou seja, carregar é colocar o programa na memória, e executar é rodar o programa que já está lá.
 - **Símbolo:** o nome de uma função ou variável global (ou `static`). Variáveis locais comuns não são símbolos.
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
+- **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa.
 
 ## O programa de exemplo
 
@@ -354,6 +355,93 @@ O linker só dá um aviso sobre alinhamento, e o erro aparece longe de onde foi 
 Isso explica a convenção de COMMON e `.bss` vista na seção anterior. Quando o compilador encontra uma variável global não inicializada (um símbolo fraco), ele não sabe se outro módulo também define essa variável, nem qual definição o linker vai escolher. Por isso, deixa a decisão para o linker e coloca a variável em COMMON. Já uma variável inicializada com zero é forte e, pela regra 1, tem que ser única, então pode ir direto para `.bss`.
 
 **Isso mudou no GCC atual.** Desde o GCC 10, o padrão é `-fno-common`, então variáveis globais não inicializadas deixaram de ser fracas na prática: compilando o exemplo `foo3.c` e `bar3.c` hoje, o linker dá erro (`multiple definition of 'x'`) em vez de escolher em silêncio. O comportamento do livro só aparece compilando com `-fcommon`.
+
+### Linking com bibliotecas estáticas
+
+Até aqui, o linker recebia só os object files do próprio programa. Na prática, todo sistema também permite empacotar vários object files relacionados em um único arquivo, a **biblioteca estática** (*static library*), que também é passada para o linker. A vantagem é que o linker **copia para o executável só os módulos da biblioteca que o programa realmente usa**.
+
+Um bom exemplo é a biblioteca padrão do C, a `libc.a`, que tem funções como `printf`, `scanf`, `strcpy` e `atoi`, e a `libm.a`, com funções matemáticas como `sin`, `cos` e `sqrt`. Sem bibliotecas estáticas, as alternativas seriam ruins:
+
+- **O compilador reconhecer as funções padrão e gerar o código delas direto**, como o Pascal faz. No C, que tem muitas funções padrão, isso deixaria o compilador muito complicado, e cada mudança em uma função exigiria uma nova versão do compilador.
+- **Colocar todas as funções em um único object file**, como um `libc.o`. Aí todo executável carregaria uma cópia da biblioteca inteira, desperdiçando disco e memória (a `libc.a` tem cerca de 5 MB), e qualquer mudança em uma função obrigaria a recompilar o arquivo todo.
+- **Deixar cada função em um object file separado** e o programador passar ao linker cada um que usa, como `printf.o` e `scanf.o`. Funciona, mas é trabalhoso e fácil de errar.
+
+A biblioteca estática resolve tudo isso: cada função fica em um módulo separado, mas todos ficam juntos em um só arquivo. No Linux, esse arquivo tem o formato **archive** (extensão `.a`): um conjunto de relocatable object files concatenados, com um cabeçalho que descreve onde está cada um. Basta passar a biblioteca para o linker:
+
+```
+linux> gcc main.c /usr/lib/libm.a /usr/lib/libc.a
+```
+
+(Na verdade, o `gcc` já passa a `libc.a` sozinho, então ela nem precisa aparecer no comando.)
+
+#### Exemplo: a biblioteca `libvector`
+
+O livro cria uma biblioteca com duas funções, `addvec` (soma dois vetores) e `multvec` (multiplica dois vetores), cada uma no seu arquivo. Cada uma também conta quantas vezes foi chamada, em uma variável global:
+
+```c
+/* addvec.c */
+int addcnt = 0;
+
+void addvec(int *x, int *y,
+            int *z, int n)
+{
+    int i;
+
+    addcnt++;
+
+    for (i = 0; i < n; i++)
+        z[i] = x[i] + y[i];
+}
+```
+
+O `multvec.c` é igual, só que com `multcnt` e `z[i] = x[i] * y[i]`. Para criar a biblioteca, compilamos os dois arquivos e juntamos os object files com o programa `ar`:
+
+```
+linux> gcc -c addvec.c multvec.c
+linux> ar rcs libvector.a addvec.o multvec.o
+```
+
+Um programa que usa a biblioteca:
+
+```c
+/* main2.c */
+#include <stdio.h>
+#include "vector.h"
+
+int x[2] = {1, 2};
+int y[2] = {3, 4};
+int z[2];
+
+int main()
+{
+    addvec(x, y, z, 2);
+    printf("z = [%d %d]\n", z[0], z[1]);
+    return 0;
+}
+```
+
+O arquivo `vector.h` só tem as declarações das funções da `libvector`. Para gerar o executável:
+
+```
+linux> gcc -c main2.c
+linux> gcc -static -o prog2c main2.o ./libvector.a
+```
+
+ou, de forma equivalente:
+
+```
+linux> gcc -static -o prog2c main2.o -L. -lvector
+```
+
+- **`-static`:** diz para gerar um executável totalmente ligado, que não precisa de mais nenhum linking quando for carregado.
+- **`-lvector`:** é um atalho para `libvector.a`.
+- **`-L.`:** diz para o linker procurar a biblioteca no diretório atual.
+
+Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida em `addvec.o`, e copia `addvec.o` para o executável. Como o programa nunca usa `multvec`, o `multvec.o` **não** é copiado. O mesmo acontece com a `libc.a`: o linker copia o `printf.o` e os outros módulos de que o `printf` precisa, e mais nada. O executável `prog2c` fica com:
+
+- `main2.o`, o código do próprio programa;
+- `addvec.o`, vindo da `libvector.a`;
+- `printf.o` e os módulos que ele usa, vindos da `libc.a`.
 
 ---
 
