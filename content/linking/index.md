@@ -18,7 +18,7 @@ Os linkers têm um papel essencial no desenvolvimento de software porque permite
 
 Existem duas formas de fazer o linking:
 
-- **Linking estático:** acontece na compilação. O linker copia para dentro do executável todo o código que o programa usa, inclusive o das bibliotecas. O executável fica maior, mas é autossuficiente e não depende de nada para rodar.
+- **Linking estático:** acontece na compilação. As bibliotecas são arquivos `.a`, uma coleção de relocatable object files (`.o`) empacotados em um só arquivo, e o linker copia para dentro do executável só os `.o` que o programa usa. O executável fica maior, mas é autossuficiente e não depende de nada para rodar.
 - **Linking dinâmico:** o código das bibliotecas fica de fora do executável, em uma *shared library* (`.so` no Linux, `.dll` no Windows), e só é ligado ao programa quando ele é carregado ou enquanto roda. Vários programas podem usar a mesma cópia da biblioteca na memória, e atualizar a biblioteca não exige refazer o linking dos programas.
 
 ## Resumo
