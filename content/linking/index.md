@@ -299,7 +299,7 @@ O `x` forte de `foo3.c` e o fraco de `bar3.c` viram a mesma variável, então `f
 
 É por isso que variáveis globais não inicializadas iam para COMMON: o compilador não sabe se outro módulo define a mesma variável e deixa a decisão para o linker. **Desde o GCC 10, o padrão é `-fno-common`**, então hoje esse exemplo dá `multiple definition of 'x'` em vez de escolher em silêncio. O comportamento do livro só aparece com `-fcommon`.
 
-## Bibliotecas estáticas
+## Linking com bibliotecas estáticas
 
 Até aqui, o linker recebia só os object files do próprio programa. Na prática, todo sistema também permite empacotar vários object files relacionados em um único arquivo, a **biblioteca estática** (*static library*), que também é passada para o linker. A vantagem é que o linker **copia para o executável só os módulos da biblioteca que o programa realmente usa**.
 
