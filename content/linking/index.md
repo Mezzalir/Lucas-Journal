@@ -292,23 +292,9 @@ linux> gcc main.c /usr/lib/libm.a /usr/lib/libc.a
 
 (Na verdade, o `gcc` já passa a `libc.a` sozinho, então ela nem precisa aparecer no comando.)
 
-### Resumindo: o que é uma biblioteca estática
-
-Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. Ela é criada com o programa `ar`. No exemplo do livro, a biblioteca `libvector.a` tem dois módulos, `addvec.o` e `multvec.o`, e o programa `main2.c` usa só a função `addvec`.
-
-Na hora de gerar o executável, o linker (`ld`, chamado pelo `gcc`) faz o seguinte:
-
-1. Olha o programa e anota as funções que ele usa mas não define, como `addvec`.
-2. Procura essas funções no índice da biblioteca.
-3. **Copia para o executável só os `.o` necessários, e inteiros.** Se o programa usa uma função de `addvec.o`, vem o `addvec.o` todo. Se nenhuma função de `multvec.o` é usada, ele fica de fora.
+O linker copia para o executável só os `.o` da biblioteca que o programa usa, e inteiros. No exemplo do livro, a biblioteca `libvector.a` tem os módulos `addvec.o` e `multvec.o`, e o programa `main2.c` usa só a função `addvec`, então só o `addvec.o` entra no executável:
 
 ![Linking com bibliotecas estáticas: main2.o, addvec.o (da libvector.a) e printf.o (da libc.a) entram no linker, que gera o executável prog2c (CS:APP, Figura 7.8)](01.png)
-
-Disso saem três consequências:
-
-- **Depois do linking, o executável não precisa mais do `.a`**, porque o código foi copiado para dentro dele.
-- **A unidade de cópia é o `.o`, não a função.** Por isso bibliotecas como a `libc` costumam ter uma função por arquivo `.c`.
-- **A ordem no comando importa.** O linker lê da esquerda para a direita e só pega da biblioteca o que já sabe que está faltando, então a biblioteca precisa vir **depois** de quem a usa. A próxima seção explica isso em detalhe.
 
 ### Como o linker usa as bibliotecas estáticas
 
