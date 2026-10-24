@@ -333,6 +333,32 @@ As seções `.symtab`, `.debug`, `.line` e `.strtab` ficam no arquivo, mas **nã
 
 Para cada segmento, o linker escolhe um endereço inicial que fique **alinhado** com a posição do segmento dentro do arquivo: os dois precisam ter o mesmo resto na divisão pelo alinhamento indicado no cabeçalho, que no exemplo é 2 MB. Isso é uma otimização que permite copiar os segmentos do arquivo para a memória de forma eficiente, por causa do jeito como a memória virtual é organizada, em blocos grandes e contíguos com tamanho potência de 2 (assunto do capítulo 9).
 
+## Carregando executable object files
+
+Para rodar um executable object file, basta digitar o nome dele no shell:
+
+```
+linux> ./prog
+```
+
+**Como `prog` não é um comando embutido do shell, o shell assume que é um executable object file e o roda chamando o *loader*, um código do sistema operacional que fica sempre na memória.** Qualquer programa do Linux pode chamar o loader usando a função `execve`. **O loader copia o código e os dados do executável do disco para a memória e então roda o programa, pulando para a primeira instrução, o *entry point*. Esse processo de copiar o programa para a memória e rodá-lo é o que se chama de *carregamento* (*loading*).**
+
+Todo programa no Linux x86-64 roda com uma imagem de memória parecida com esta:
+
+![Imagem de memória de um programa no Linux x86-64: segmento de código a partir de 0x400000, segmento de dados, heap, região das shared libraries, pilha do usuário e, no topo, a memória do kernel (CS:APP, Figura 7.15)](03.png)
+
+De baixo para cima:
+
+- **Segmento de código** (`.init`, `.text`, `.rodata`), que começa no endereço `0x400000`, e logo acima o **segmento de dados** (`.data`, `.bss`). Os dois vêm do executável.
+- **Heap**, que cresce para cima conforme o programa chama `malloc`.
+- **Região das shared libraries.**
+- **Pilha do usuário**, que começa no maior endereço permitido ao programa (2⁴⁸ − 1) e cresce para baixo.
+- **Memória do kernel**, acima de tudo, que o programa não consegue acessar.
+
+Na prática, existem espaços entre essas regiões, por causa do alinhamento dos segmentos e do **ASLR** (*address-space layout randomization*), que sorteia os endereços da pilha, das shared libraries e do heap a cada execução. Os endereços mudam, mas a ordem das regiões continua a mesma.
+
+Guiado pela tabela de cabeçalhos de programa, o loader copia os pedaços do executável para os segmentos de código e de dados e pula para o entry point, que é sempre a função `_start`, definida no object file de sistema `crt1.o`. A `_start` chama a `__libc_start_main` (da `libc.so`), que prepara o ambiente de execução, chama o `main` do programa, trata o valor que ele retorna e, se precisar, devolve o controle ao kernel.
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -351,6 +377,7 @@ Para cada segmento, o linker escolhe um endereço inicial que fique **alinhado**
 - **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa. Como o linker lê os arquivos da esquerda para a direita, **as bibliotecas devem vir no fim do comando**, depois dos arquivos que usam as funções delas.
 - **Relocação:** para cada referência cujo endereço não conhece, o montador deixa uma **entrada de relocação**. Depois de decidir os endereços, o linker usa essas entradas para corrigir o código: referências **relativas ao PC** (como o `call`) recebem a distância até o símbolo, e referências **absolutas** recebem o endereço dele.
 - **Executable object file:** tem formato parecido com o do relocatable object file, mas já está relocado, não tem seções `.rel` e o cabeçalho ELF guarda o **entry point**, o endereço da primeira instrução. A **tabela de cabeçalhos de programa** diz quais partes do arquivo viram os segmentos de código e de dados na memória.
+- **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e pilha, com o kernel no topo.
 
 ---
 
