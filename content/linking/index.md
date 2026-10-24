@@ -374,6 +374,45 @@ codigo 0x599d32fce159  dados 0x599d32fd1020  heap 0x599d4411a010  lib 0x7c6c1365
 
 Todos os endereços mudaram, mas a distância entre o código e os dados continua igual (`0x2ec7`). Compilando com `-no-pie`, o código volta a ficar fixo em `0x401156`, perto do `0x400000` do livro, e só o heap, as bibliotecas e a stack continuam mudando.
 
+### Como o loader funciona de verdade
+
+A descrição acima é simplificada. Na prática, cada programa roda em um **processo**, com seu próprio espaço de endereçamento virtual. Quando você roda `./prog`, o shell cria um processo filho, uma cópia de si mesmo, e esse filho chama o `execve`, que aciona o loader. O loader apaga os segmentos de memória virtual que o processo tinha e cria novos segmentos de código, dados, heap e stack, com a stack e o heap zerados. Os segmentos de código e dados são **mapeados** para pedaços do executable object file, sem copiar nada: os dados só são trazidos do disco para a memória quando o processador acessa aquela página pela primeira vez, pelo mecanismo de paginação do sistema operacional (assunto do capítulo 9).
+
+## Dynamic linking com shared libraries
+
+As bibliotecas estáticas ainda têm dois problemas:
+
+- **Atualização:** quando sai uma versão nova de uma biblioteca, todo programa que a usa precisa refazer o linking com ela de propósito. Se ninguém fizer isso, o programa continua com a versão antiga.
+- **Desperdício:** quase todo programa usa funções como `printf` e `scanf`, e o código delas é copiado para cada executável. Em um sistema rodando centenas de processos, isso significa centenas de cópias iguais desse código na memória.
+
+As **shared libraries** resolvem os dois. Uma shared library é um módulo que pode ser carregado em qualquer endereço da memória, na hora de carregar o programa ou durante a execução, e ser ligado a ele ali. Esse processo é o **dynamic linking**, e quem faz é o **dynamic linker**. No Linux, as shared libraries são os **shared object files** (`.so`); no Windows, as DLLs.
+
+Elas são "compartilhadas" de duas formas:
+
+- **No disco:** existe um único `.so` para cada biblioteca, e todos os executáveis que a usam apontam para ele, sem copiar o código para dentro de si.
+- **Na memória:** uma única cópia da `.text` da biblioteca é usada por todos os processos que estão rodando.
+
+Para criar uma shared library e usá-la:
+
+```
+linux> gcc -shared -fpic -o libvector.so addvec.c multvec.c
+linux> gcc -o prog21 main2.c ./libvector.so
+```
+
+O `-fpic` gera **código independente de posição** (*position-independent code*), que funciona em qualquer endereço, e o `-shared` diz para criar um shared object file.
+
+![Dynamic linking com shared libraries: o linker gera o prog21 parcialmente ligado, usando só as informações de relocação e de símbolos da libc.so e da libvector.so; na hora de carregar, o dynamic linker (ld-linux.so) completa o linking com o código e os dados delas (CS:APP, Figura 7.16)](04.png)
+
+A ideia é fazer **parte do linking na criação do executável e terminar o resto quando ele é carregado**. Nenhum código ou dado da `libvector.so` é copiado para o `prog21`: o linker só copia informações de relocação e da tabela de símbolos, para que as referências à biblioteca possam ser resolvidas depois.
+
+Quando o loader carrega o `prog21`, ele percebe que o executável tem uma seção `.interp`, com o caminho do dynamic linker (no Linux, o `ld-linux.so`, que também é um shared object file). Em vez de passar o controle direto para o programa, o loader roda o dynamic linker, que termina o linking:
+
+1. Reloca o código e os dados da `libc.so` em um segmento da memória.
+2. Reloca o código e os dados da `libvector.so` em outro segmento.
+3. Reloca as referências do `prog21` aos símbolos definidos nessas bibliotecas.
+
+Por fim, o dynamic linker passa o controle para o programa. A partir daí, as shared libraries ficam em endereços fixos até o programa terminar.
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -393,6 +432,7 @@ Todos os endereços mudaram, mas a distância entre o código e os dados continu
 - **Relocação:** para cada referência cujo endereço não conhece, o montador deixa uma **entrada de relocação**. Depois de decidir os endereços, o linker usa essas entradas para corrigir o código: referências **relativas ao PC** (como o `call`) recebem a distância até o símbolo, e referências **absolutas** recebem o endereço dele.
 - **Executable object file:** tem formato parecido com o do relocatable object file, mas já está relocado, não tem seções `.rel` e o cabeçalho ELF guarda o **entry point**, o endereço da primeira instrução. A **tabela de cabeçalhos de programa** diz quais partes do arquivo viram os segmentos de código e de dados na memória.
 - **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e stack, com o kernel no topo. Por causa do **ASLR**, os endereços dessas regiões mudam a cada execução, o que dificulta ataques, mas a ordem delas é sempre a mesma.
+- **Dynamic linking:** com **shared libraries** (`.so`), o código da biblioteca não é copiado para o executável. O linker faz só parte do trabalho, e o **dynamic linker** (`ld-linux.so`) termina o linking quando o programa é carregado. Assim, uma única cópia da biblioteca no disco e na memória serve a todos os programas, e atualizá-la não exige refazer o linking deles.
 
 ---
 
