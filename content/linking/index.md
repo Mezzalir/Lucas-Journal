@@ -521,57 +521,10 @@ Para saber o que corrigir, o linker usa as **entradas de relocação** (`.rela.t
 
 ### Relocando referências a símbolos
 
-O algoritmo percorre cada seção e cada entrada de relocação dela:
+O linker percorre cada seção e cada entrada de relocação dela. Para cada entrada, ele acha o ponto da seção que precisa ser corrigido e escreve ali o valor certo, de acordo com o tipo:
 
-```c
-foreach section s {
-    foreach relocation entry r {
-        refptr = s + r.offset;  /* onde está a referência a corrigir */
-
-        /* Referência relativa ao PC */
-        if (r.type == R_X86_64_PC32) {
-            refaddr = ADDR(s) + r.offset;  /* endereço da referência em execução */
-            *refptr = (unsigned) (ADDR(r.symbol) + r.addend - refaddr);
-        }
-
-        /* Referência absoluta */
-        if (r.type == R_X86_64_32)
-            *refptr = (unsigned) (ADDR(r.symbol) + r.addend);
-    }
-}
-```
-
-Em palavras: se a referência é relativa ao PC, o linker escreve nela a **distância** do ponto da referência até o símbolo. Se é absoluta, escreve o **endereço** do símbolo direto.
-
-No exemplo, o `main.o` desmontado com `objdump -dr` mostra as duas referências que precisam de correção, cada uma com sua entrada de relocação logo abaixo:
-
-```
-0000000000000000 <main>:
-   0:  48 83 ec 08      sub    $0x8,%rsp
-   4:  be 02 00 00 00   mov    $0x2,%esi
-   9:  bf 00 00 00 00   mov    $0x0,%edi       # %edi = &array
-           a: R_X86_64_32    array             # entrada de relocação
-   e:  e8 00 00 00 00   callq  13 <main+0x13>  # sum()
-           f: R_X86_64_PC32  sum-0x4           # entrada de relocação
-  13:  48 83 c4 08      add    $0x8,%rsp
-  17:  c3               retq
-```
-
-Os quatro bytes zerados são só espaços reservados que o linker vai preencher.
-
-**A chamada a `sum` (relativa ao PC).** A entrada diz: offset `0xf`, símbolo `sum`, tipo `R_X86_64_PC32`, addend `-4`. Supondo que o linker colocou a `.text` em `0x4004d0` e a `sum` em `0x4004e8`, a referência fica em `0x4004df`, e o linker escreve ali a distância até `sum` descontando 4, o que dá `0x5`:
-
-```
-4004de:  e8 05 00 00 00   callq  4004e8 <sum>
-```
-
-O `-4` existe porque, quando o `call` executa, o PC já aponta para a instrução seguinte (`0x4004e3`), 4 bytes depois da referência. Somando os 5, o processador chega exatamente em `0x4004e8`, o início da `sum`.
-
-**O endereço de `array` (absoluto).** A entrada diz: offset `0xa`, símbolo `array`, tipo `R_X86_64_32`, addend `0`. Se o linker colocou `array` em `0x601018`, ele simplesmente escreve esse endereço na instrução (com os bytes invertidos, porque o x86-64 é little endian):
-
-```
-4004d9:  bf 18 10 60 00   mov    $0x601018,%edi
-```
+- **Referência relativa ao PC:** o linker escreve a **distância** entre a instrução e o símbolo. Na execução, o processador soma essa distância ao PC e chega ao símbolo. O addend serve para compensar o fato de que, quando a instrução executa, o PC já aponta para a instrução seguinte.
+- **Referência absoluta:** o linker escreve o **endereço** do símbolo direto, e a instrução o usa sem nenhum cálculo.
 
 ---
 
