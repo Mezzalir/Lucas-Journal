@@ -447,6 +447,22 @@ Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida
 - `addvec.o`, vindo da `libvector.a`;
 - `printf.o` e os módulos que ele usa, vindos da `libc.a`.
 
+#### Resumindo: o que é uma biblioteca estática
+
+Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. O `s` do `ar rcs` é o que cria esse índice.
+
+Na hora de gerar o executável, o linker (`ld`, chamado pelo `gcc`) faz o seguinte:
+
+1. Olha o programa e anota as funções que ele usa mas não define, como `addvec`.
+2. Procura essas funções no índice da biblioteca.
+3. **Copia para o executável só os `.o` necessários, e inteiros.** Se o programa usa uma função de `addvec.o`, vem o `addvec.o` todo. Se nenhuma função de `multvec.o` é usada, ele fica de fora.
+
+Disso saem três consequências:
+
+- **Depois do linking, o executável não precisa mais do `.a`**, porque o código foi copiado para dentro dele.
+- **A unidade de cópia é o `.o`, não a função.** Por isso bibliotecas como a `libc` costumam ter uma função por arquivo `.c`.
+- **A ordem no comando importa.** O linker lê da esquerda para a direita e só pega da biblioteca o que já sabe que está faltando, então a biblioteca precisa vir **depois** de quem a usa. A próxima seção explica isso em detalhe.
+
 ### Como o linker usa as bibliotecas estáticas
 
 As bibliotecas estáticas são úteis, mas também confundem muita gente por causa do jeito como o linker do Linux as usa. O linker lê os arquivos **da esquerda para a direita, na ordem em que aparecem no comando**, e vai mantendo três conjuntos:
