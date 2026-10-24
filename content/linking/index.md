@@ -153,8 +153,6 @@ Alguns detalhes que valem destacar:
 - **A seção `.bss` não ocupa espaço no arquivo.** Como as variáveis dela começam todas com zero, não faz sentido guardar esses zeros no disco: o arquivo só registra quanto espaço elas precisam, e a memória é zerada quando o programa é carregado. O nome vem de uma diretiva do montador do IBM 704, de 1957 (*block started by symbol*), mas o livro sugere lembrar como *Better Save Space*.
 - **Todo relocatable object file tem tabela de símbolos**, mesmo compilado sem `-g`. O `-g` só acrescenta as informações de depuração (`.debug` e `.line`).
 
-Dá para ver as seções de um object file com o comando `readelf -S main.o`, a tabela de símbolos com `readelf -s main.o` e as entradas de relocação com `readelf -r main.o`. Compilando o exemplo no x86-64, a seção de relocação aparece como `.rela.text` em vez de `.rel.text`: é uma variante do mesmo formato, usada no x86-64, que guarda um valor extra em cada entrada. E ela tem duas entradas: uma para a chamada a `sum` e outra para o endereço de `array`, já que o `main.o` ainda não sabe onde nenhum dos dois vai ficar na memória.
-
 ## Símbolos e tabelas de símbolos
 
 Um **símbolo** é um nome que aparece no nível global do código C: uma função ou uma variável global (ou `static`). No exemplo, `main`, `array` e `sum` são símbolos. Já as variáveis declaradas dentro das funções, como `val`, `i` e `s`, não são.
