@@ -92,7 +92,7 @@ Um **linker estático**, como o `ld` do Linux, pega vários relocatable object f
 
 Para fazer isso, o linker tem duas tarefas:
 
-1. **Resolução de símbolos:** símbolos são os nomes de funções, variáveis globais e variáveis `static`. Um arquivo pode *definir* um símbolo ou só *referenciá-lo*. O linker liga cada referência a exatamente uma definição. No exemplo, `main.c` referencia `sum`, e o linker encontra a definição em `sum.c`. Variáveis locais não entram nessa conta, a não ser que sejam declaradas como `static`: as comuns ficam na pilha, e o linker nem sabe que elas existem.
+1. **Resolução de símbolos:** símbolos são os nomes de funções, variáveis globais e variáveis `static`. Um arquivo pode *definir* um símbolo ou só *referenciá-lo*. O linker liga cada referência a exatamente uma definição. No exemplo, `main.c` referencia `sum`, e o linker encontra a definição em `sum.c`. Variáveis locais não entram nessa conta, a não ser que sejam declaradas como `static`: as comuns ficam na stack, e o linker nem sabe que elas existem.
 2. **Relocação:** o compilador e o montador geram cada arquivo como se ele começasse no endereço 0, porque ainda não sabem onde ele vai ficar. O linker decide o endereço final de cada símbolo e corrige todas as referências para apontarem para lá. Ele faz isso seguindo instruções deixadas pelo montador, as *entradas de relocação*.
 
 O ponto importante é que **o linker é bem simples**: para ele, um object file é só um conjunto de blocos de bytes (código, dados e informações para o linker e o loader). Ele junta os blocos, decide onde cada um fica na memória e ajusta os endereços. Quase todo o trabalho pesado já foi feito antes, pelo compilador e pelo montador.
@@ -149,7 +149,7 @@ As seções guardam o conteúdo do arquivo:
 
 Alguns detalhes que valem destacar:
 
-- **Variáveis locais não aparecem em nenhuma dessas seções.** Elas são criadas na pilha durante a execução, então o linker não precisa saber delas. A variável `val` de `main`, por exemplo, não está em `.data` nem na tabela de símbolos.
+- **Variáveis locais não aparecem em nenhuma dessas seções.** Elas são criadas na stack durante a execução, então o linker não precisa saber delas. A variável `val` de `main`, por exemplo, não está em `.data` nem na tabela de símbolos.
 - **A seção `.bss` não ocupa espaço no arquivo.** Como as variáveis dela começam todas com zero, não faz sentido guardar esses zeros no disco: o arquivo só registra quanto espaço elas precisam, e a memória é zerada quando o programa é carregado. O nome vem de uma diretiva do montador do IBM 704, de 1957 (*block started by symbol*), mas o livro sugere lembrar como *Better Save Space*.
 - **Todo relocatable object file tem tabela de símbolos**, mesmo compilado sem `-g`. O `-g` só acrescenta as informações de depuração (`.debug` e `.line`).
 
@@ -180,9 +180,9 @@ Em C, o `static` em uma variável global ou função faz o papel do `private` em
 
 ### Símbolos locais não são variáveis locais
 
-Um ponto que confunde: **símbolo local do linker não é o mesmo que variável local do programa**. As variáveis locais comuns (como `val`, `i` e `s` do exemplo) ficam na pilha durante a execução e não aparecem na tabela de símbolos. O linker nem sabe que elas existem.
+Um ponto que confunde: **símbolo local do linker não é o mesmo que variável local do programa**. As variáveis locais comuns (como `val`, `i` e `s` do exemplo) ficam na stack durante a execução e não aparecem na tabela de símbolos. O linker nem sabe que elas existem.
 
-A exceção são as variáveis locais declaradas com `static`. Como precisam manter o valor entre uma chamada e outra, elas não ficam na pilha: o compilador reserva espaço para elas em `.data` ou `.bss` e cria um símbolo local para cada uma. Se duas funções do mesmo arquivo tiverem uma variável `static` com o mesmo nome, o compilador dá nomes diferentes para cada uma:
+A exceção são as variáveis locais declaradas com `static`. Como precisam manter o valor entre uma chamada e outra, elas não ficam na stack: o compilador reserva espaço para elas em `.data` ou `.bss` e cria um símbolo local para cada uma. Se duas funções do mesmo arquivo tiverem uma variável `static` com o mesmo nome, o compilador dá nomes diferentes para cada uma:
 
 ```c
 int f()
@@ -345,21 +345,21 @@ linux> ./prog
 
 Todo programa no Linux x86-64 roda com uma imagem de memória parecida com esta:
 
-![Imagem de memória de um programa no Linux x86-64: segmento de código a partir de 0x400000, segmento de dados, heap, região das shared libraries, pilha do usuário e, no topo, a memória do kernel (CS:APP, Figura 7.15)](03.png)
+![Imagem de memória de um programa no Linux x86-64: segmento de código a partir de 0x400000, segmento de dados, heap, região das shared libraries, stack do usuário e, no topo, a memória do kernel (CS:APP, Figura 7.15)](03.png)
 
 De baixo para cima:
 
 - **Segmento de código** (`.init`, `.text`, `.rodata`), que começa no endereço `0x400000`, e logo acima o **segmento de dados** (`.data`, `.bss`). Os dois vêm do executável.
 - **Heap**, que cresce para cima conforme o programa chama `malloc`.
 - **Região das shared libraries.**
-- **Pilha do usuário**, que começa no maior endereço permitido ao programa (2⁴⁸ − 1) e cresce para baixo.
+- **Stack do usuário**, que começa no maior endereço permitido ao programa (2⁴⁸ − 1) e cresce para baixo.
 - **Memória do kernel**, acima de tudo, que o programa não consegue acessar.
 
 Quando o loader roda, ele cria uma imagem de memória parecida com a da figura. Guiado pela tabela de cabeçalhos de programa, ele copia pedaços do executable object file para os segmentos de código e de dados. Em seguida, o loader pula para o entry point do programa, que é sempre o endereço da função `_start`. Essa função é definida no object file de sistema `crt1.o` e é a mesma para todos os programas em C. A `_start` chama a *função de inicialização do sistema* (*system startup function*), a `__libc_start_main`, que é definida na `libc.so`. Ela inicializa o ambiente de execução, chama a função `main` do programa, trata o valor que ela retorna e, se necessário, devolve o controle ao kernel.
 
 ### Os endereços mudam a cada execução (ASLR)
 
-A figura mostra as regiões encostadas umas nas outras, mas na prática existem espaços entre elas, em parte por causa do alinhamento dos segmentos. O motivo principal, porém, é o **ASLR** (*address-space layout randomization*): **a cada execução, o sistema sorteia onde ficam a pilha, o heap e as shared libraries.** Rodar o mesmo programa duas vezes dá endereços diferentes.
+A figura mostra as regiões encostadas umas nas outras, mas na prática existem espaços entre elas, em parte por causa do alinhamento dos segmentos. O motivo principal, porém, é o **ASLR** (*address-space layout randomization*): **a cada execução, o sistema sorteia onde ficam a stack, o heap e as shared libraries.** Rodar o mesmo programa duas vezes dá endereços diferentes.
 
 Isso é uma defesa de segurança. Muitos ataques, como os de *buffer overflow*, dependem de saber de antemão em que endereço está um certo código ou dado na memória. Com os endereços sorteados, o atacante não tem como adivinhar para onde pular.
 
@@ -368,11 +368,11 @@ O que **não** muda é a organização: a ordem das regiões é sempre a mesma, 
 Hoje o sorteio vai além do que o livro mostra. O GCC atual gera executáveis **PIE** (*position-independent executable*) por padrão, então até o segmento de código muda de lugar, em vez de começar sempre em `0x400000`. Imprimindo o endereço de `main`, de uma variável global, de um `malloc`, do `printf` e de uma variável local, em duas execuções seguidas:
 
 ```
-codigo 0x5a13f76d0159  dados 0x5a13f76d3020  heap 0x5a1403f5b010  lib 0x7f6079c5b8b0  pilha 0x7ffc2d9f5b44
-codigo 0x599d32fce159  dados 0x599d32fd1020  heap 0x599d4411a010  lib 0x7c6c1365b8b0  pilha 0x7ffd26edd074
+codigo 0x5a13f76d0159  dados 0x5a13f76d3020  heap 0x5a1403f5b010  lib 0x7f6079c5b8b0  stack 0x7ffc2d9f5b44
+codigo 0x599d32fce159  dados 0x599d32fd1020  heap 0x599d4411a010  lib 0x7c6c1365b8b0  stack 0x7ffd26edd074
 ```
 
-Todos os endereços mudaram, mas a distância entre o código e os dados continua igual (`0x2ec7`). Compilando com `-no-pie`, o código volta a ficar fixo em `0x401156`, perto do `0x400000` do livro, e só o heap, as bibliotecas e a pilha continuam mudando.
+Todos os endereços mudaram, mas a distância entre o código e os dados continua igual (`0x2ec7`). Compilando com `-no-pie`, o código volta a ficar fixo em `0x401156`, perto do `0x400000` do livro, e só o heap, as bibliotecas e a stack continuam mudando.
 
 ## Resumo
 
@@ -392,7 +392,7 @@ Todos os endereços mudaram, mas a distância entre o código e os dados continu
 - **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa. Como o linker lê os arquivos da esquerda para a direita, **as bibliotecas devem vir no fim do comando**, depois dos arquivos que usam as funções delas.
 - **Relocação:** para cada referência cujo endereço não conhece, o montador deixa uma **entrada de relocação**. Depois de decidir os endereços, o linker usa essas entradas para corrigir o código: referências **relativas ao PC** (como o `call`) recebem a distância até o símbolo, e referências **absolutas** recebem o endereço dele.
 - **Executable object file:** tem formato parecido com o do relocatable object file, mas já está relocado, não tem seções `.rel` e o cabeçalho ELF guarda o **entry point**, o endereço da primeira instrução. A **tabela de cabeçalhos de programa** diz quais partes do arquivo viram os segmentos de código e de dados na memória.
-- **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e pilha, com o kernel no topo. Por causa do **ASLR**, os endereços dessas regiões mudam a cada execução, o que dificulta ataques, mas a ordem delas é sempre a mesma.
+- **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e stack, com o kernel no topo. Por causa do **ASLR**, os endereços dessas regiões mudam a cada execução, o que dificulta ataques, mas a ordem delas é sempre a mesma.
 
 ---
 
