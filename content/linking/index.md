@@ -370,7 +370,7 @@ Um bom exemplo é a biblioteca padrão do C, a `libc.a`, que tem funções como 
 - **Colocar todas as funções em um único object file**, como um `libc.o`. Aí todo executável carregaria uma cópia da biblioteca inteira, desperdiçando disco e memória (a `libc.a` tem cerca de 5 MB), e qualquer mudança em uma função obrigaria a recompilar o arquivo todo.
 - **Deixar cada função em um object file separado** e o programador passar ao linker cada um que usa, como `printf.o` e `scanf.o`. Funciona, mas é trabalhoso e fácil de errar.
 
-A biblioteca estática resolve tudo isso: cada função fica em um módulo separado, mas todos ficam juntos em um só arquivo. No Linux, esse arquivo tem o formato **archive** (extensão `.a`): um conjunto de relocatable object files concatenados, com um cabeçalho que descreve onde está cada um. Basta passar a biblioteca para o linker:
+**A biblioteca estática resolve tudo isso: cada função fica em um módulo separado, mas todos ficam juntos em um só arquivo.** No Linux, esse arquivo tem o formato **archive** (extensão `.a`): um conjunto de relocatable object files concatenados, com um cabeçalho que descreve onde está cada um. Basta passar a biblioteca para o linker:
 
 ```
 linux> gcc main.c /usr/lib/libm.a /usr/lib/libc.a
