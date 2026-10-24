@@ -37,6 +37,7 @@ Existem duas formas de fazer o linking:
   - Os globais também podem ser **fortes** (funções e variáveis inicializadas) ou **fracos** (variáveis não inicializadas), o que decide qual definição o linker escolhe quando há nomes repetidos.
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
 - **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa. Como o linker lê os arquivos da esquerda para a direita, **as bibliotecas devem vir no fim do comando**, depois dos arquivos que usam as funções delas.
+- **Relocação:** para cada referência cujo endereço não conhece, o montador deixa uma **entrada de relocação**. Depois de decidir os endereços, o linker usa essas entradas para corrigir o código: referências **relativas ao PC** (como o `call`) recebem a distância até o símbolo, e referências **absolutas** recebem o endereço dele.
 
 ## O programa de exemplo
 
@@ -508,6 +509,69 @@ linux> gcc foo.c libx.a liby.a libx.a
 ```
 
 Outra saída é juntar `libx.a` e `liby.a` em uma única biblioteca.
+
+## Relocação
+
+Terminada a resolução de símbolos, cada referência já está ligada a uma única definição. Na relocação, o linker junta as seções do mesmo tipo de todos os módulos (todas as `.text` viram uma só, todas as `.data` também), decide o endereço de execução de cada seção e de cada símbolo e, por fim, corrige as referências no código para apontarem para esses endereços.
+
+Para saber o que corrigir, o linker usa as **entradas de relocação** (`.rela.text` e `.rela.data`). O montador cria uma entrada sempre que encontra uma referência a algo cujo endereço final ele ainda não conhece. Cada entrada diz **onde** está a referência dentro da seção (*offset*), **a qual símbolo** ela se refere, **como** corrigir (*type*) e uma constante que entra no cálculo (*addend*). Os dois tipos básicos são:
+
+- **`R_X86_64_PC32`:** endereço **relativo ao PC**, ou seja, a distância entre o símbolo e a instrução. É o usado pelo `call`.
+- **`R_X86_64_32`:** endereço **absoluto** de 32 bits, usado diretamente.
+
+### Relocando referências a símbolos
+
+O algoritmo percorre cada seção e cada entrada de relocação dela:
+
+```c
+foreach section s {
+    foreach relocation entry r {
+        refptr = s + r.offset;  /* onde está a referência a corrigir */
+
+        /* Referência relativa ao PC */
+        if (r.type == R_X86_64_PC32) {
+            refaddr = ADDR(s) + r.offset;  /* endereço da referência em execução */
+            *refptr = (unsigned) (ADDR(r.symbol) + r.addend - refaddr);
+        }
+
+        /* Referência absoluta */
+        if (r.type == R_X86_64_32)
+            *refptr = (unsigned) (ADDR(r.symbol) + r.addend);
+    }
+}
+```
+
+Em palavras: se a referência é relativa ao PC, o linker escreve nela a **distância** do ponto da referência até o símbolo. Se é absoluta, escreve o **endereço** do símbolo direto.
+
+No exemplo, o `main.o` desmontado com `objdump -dr` mostra as duas referências que precisam de correção, cada uma com sua entrada de relocação logo abaixo:
+
+```
+0000000000000000 <main>:
+   0:  48 83 ec 08      sub    $0x8,%rsp
+   4:  be 02 00 00 00   mov    $0x2,%esi
+   9:  bf 00 00 00 00   mov    $0x0,%edi       # %edi = &array
+           a: R_X86_64_32    array             # entrada de relocação
+   e:  e8 00 00 00 00   callq  13 <main+0x13>  # sum()
+           f: R_X86_64_PC32  sum-0x4           # entrada de relocação
+  13:  48 83 c4 08      add    $0x8,%rsp
+  17:  c3               retq
+```
+
+Os quatro bytes zerados são só espaços reservados que o linker vai preencher.
+
+**A chamada a `sum` (relativa ao PC).** A entrada diz: offset `0xf`, símbolo `sum`, tipo `R_X86_64_PC32`, addend `-4`. Supondo que o linker colocou a `.text` em `0x4004d0` e a `sum` em `0x4004e8`, a referência fica em `0x4004df`, e o linker escreve ali a distância até `sum` descontando 4, o que dá `0x5`:
+
+```
+4004de:  e8 05 00 00 00   callq  4004e8 <sum>
+```
+
+O `-4` existe porque, quando o `call` executa, o PC já aponta para a instrução seguinte (`0x4004e3`), 4 bytes depois da referência. Somando os 5, o processador chega exatamente em `0x4004e8`, o início da `sum`.
+
+**O endereço de `array` (absoluto).** A entrada diz: offset `0xa`, símbolo `array`, tipo `R_X86_64_32`, addend `0`. Se o linker colocou `array` em `0x601018`, ele simplesmente escreve esse endereço na instrução (com os bytes invertidos, porque o x86-64 é little endian):
+
+```
+4004d9:  bf 18 10 60 00   mov    $0x601018,%edi
+```
 
 ---
 
