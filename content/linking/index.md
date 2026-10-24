@@ -292,86 +292,17 @@ linux> gcc main.c /usr/lib/libm.a /usr/lib/libc.a
 
 (Na verdade, o `gcc` já passa a `libc.a` sozinho, então ela nem precisa aparecer no comando.)
 
-### Exemplo: a biblioteca `libvector`
-
-O livro cria uma biblioteca com duas funções, `addvec` (soma dois vetores) e `multvec` (multiplica dois vetores), cada uma no seu arquivo. Cada uma também conta quantas vezes foi chamada, em uma variável global:
-
-```c
-/* addvec.c */
-int addcnt = 0;
-
-void addvec(int *x, int *y,
-            int *z, int n)
-{
-    int i;
-
-    addcnt++;
-
-    for (i = 0; i < n; i++)
-        z[i] = x[i] + y[i];
-}
-```
-
-O `multvec.c` é igual, só que com `multcnt` e `z[i] = x[i] * y[i]`. Para criar a biblioteca, compilamos os dois arquivos e juntamos os object files com o programa `ar`:
-
-```
-linux> gcc -c addvec.c multvec.c
-linux> ar rcs libvector.a addvec.o multvec.o
-```
-
-Um programa que usa a biblioteca:
-
-```c
-/* main2.c */
-#include <stdio.h>
-#include "vector.h"
-
-int x[2] = {1, 2};
-int y[2] = {3, 4};
-int z[2];
-
-int main()
-{
-    addvec(x, y, z, 2);
-    printf("z = [%d %d]\n", z[0], z[1]);
-    return 0;
-}
-```
-
-O arquivo `vector.h` só tem as declarações das funções da `libvector`. Para gerar o executável:
-
-```
-linux> gcc -c main2.c
-linux> gcc -static -o prog2c main2.o ./libvector.a
-```
-
-ou, de forma equivalente:
-
-```
-linux> gcc -static -o prog2c main2.o -L. -lvector
-```
-
-- **`-static`:** diz para gerar um executável totalmente ligado, que não precisa de mais nenhum linking quando for carregado.
-- **`-lvector`:** é um atalho para `libvector.a`.
-- **`-L.`:** diz para o linker procurar a biblioteca no diretório atual.
-
-Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida em `addvec.o`, e copia `addvec.o` para o executável. Como o programa nunca usa `multvec`, o `multvec.o` **não** é copiado. O mesmo acontece com a `libc.a`: o linker copia o `printf.o` e os outros módulos de que o `printf` precisa, e mais nada. O executável `prog2c` fica com:
-
-- `main2.o`, o código do próprio programa;
-- `addvec.o`, vindo da `libvector.a`;
-- `printf.o` e os módulos que ele usa, vindos da `libc.a`.
-
-![Linking com bibliotecas estáticas: main2.o, addvec.o (da libvector.a) e printf.o (da libc.a) entram no linker, que gera o executável prog2c (CS:APP, Figura 7.8)](01.png)
-
 ### Resumindo: o que é uma biblioteca estática
 
-Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. O `s` do `ar rcs` é o que cria esse índice.
+Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. Ela é criada com o programa `ar`. No exemplo do livro, a biblioteca `libvector.a` tem dois módulos, `addvec.o` e `multvec.o`, e o programa `main2.c` usa só a função `addvec`.
 
 Na hora de gerar o executável, o linker (`ld`, chamado pelo `gcc`) faz o seguinte:
 
 1. Olha o programa e anota as funções que ele usa mas não define, como `addvec`.
 2. Procura essas funções no índice da biblioteca.
 3. **Copia para o executável só os `.o` necessários, e inteiros.** Se o programa usa uma função de `addvec.o`, vem o `addvec.o` todo. Se nenhuma função de `multvec.o` é usada, ele fica de fora.
+
+![Linking com bibliotecas estáticas: main2.o, addvec.o (da libvector.a) e printf.o (da libc.a) entram no linker, que gera o executável prog2c (CS:APP, Figura 7.8)](01.png)
 
 Disso saem três consequências:
 
