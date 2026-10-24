@@ -413,6 +413,73 @@ Quando o loader carrega o `prog21`, ele percebe que o executável tem uma seçã
 
 Por fim, o dynamic linker passa o controle para o programa. A partir daí, as shared libraries ficam em endereços fixos até o programa terminar.
 
+## Carregando e ligando shared libraries a partir do programa
+
+Até aqui, o dynamic linker carregava as shared libraries quando o programa era carregado, logo antes de começar a rodar. Mas também dá para o **próprio programa pedir, durante a execução**, que o dynamic linker carregue e ligue uma shared library qualquer, sem que ela tenha sido ligada ao programa na compilação. Dois usos reais:
+
+- **Distribuir atualizações:** programas para Windows costumam ser atualizados trocando uma shared library pela versão nova. Na próxima vez que o programa roda, ele carrega a nova automaticamente.
+- **Servidores web rápidos:** os primeiros servidores geravam conteúdo dinâmico (páginas personalizadas, saldos de conta, anúncios) criando um processo filho com `fork` e `execve` a cada requisição. Os modernos colocam cada função que gera conteúdo em uma shared library. Quando chega uma requisição, o servidor carrega a função certa e a chama diretamente. Ela fica guardada no espaço de endereçamento do servidor, então as próximas requisições custam só uma chamada de função. Também dá para atualizar ou acrescentar funções sem parar o servidor.
+
+No Linux, isso é feito com quatro funções da `<dlfcn.h>`:
+
+- **`dlopen(filename, flag)`:** carrega e liga a shared library `filename` e devolve um *handle* para ela (ou NULL, se der erro). O `flag` diz quando resolver os símbolos externos: `RTLD_NOW` resolve na hora e `RTLD_LAZY` só quando o código da biblioteca for executado.
+- **`dlsym(handle, symbol)`:** devolve o endereço do símbolo `symbol` dentro da biblioteca aberta, ou NULL se ele não existir.
+- **`dlclose(handle)`:** descarrega a biblioteca, se nenhuma outra estiver usando.
+- **`dlerror()`:** devolve uma mensagem descrevendo o último erro dessas funções, ou NULL se não houve erro.
+
+O programa abaixo carrega a `libvector.so` durante a execução e chama a `addvec`:
+
+```c
+/* dll.c */
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+
+int x[2] = {1, 2};
+int y[2] = {3, 4};
+int z[2];
+
+int main()
+{
+    void *handle;
+    void (*addvec)(int *, int *, int *, int);
+    char *error;
+
+    /* Carrega a shared library que contém addvec() */
+    handle = dlopen("./libvector.so", RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "%s\n", dlerror());
+        exit(1);
+    }
+
+    /* Pega um ponteiro para a função addvec() */
+    addvec = dlsym(handle, "addvec");
+    if ((error = dlerror()) != NULL) {
+        fprintf(stderr, "%s\n", error);
+        exit(1);
+    }
+
+    /* Agora addvec() pode ser chamada como qualquer outra função */
+    addvec(x, y, z, 2);
+    printf("z = [%d %d]\n", z[0], z[1]);
+
+    /* Descarrega a shared library */
+    if (dlclose(handle) < 0) {
+        fprintf(stderr, "%s\n", dlerror());
+        exit(1);
+    }
+    return 0;
+}
+```
+
+Para compilar:
+
+```
+linux> gcc -rdynamic -o prog2r dll.c -ldl
+```
+
+O `-rdynamic` deixa os símbolos globais do próprio executável disponíveis para as bibliotecas abertas com `dlopen`, e o `-ldl` liga a biblioteca que tem essas funções. Nas versões atuais da glibc, elas já fazem parte da `libc`, então o `-ldl` não é mais necessário, mas continua funcionando.
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -433,6 +500,7 @@ Por fim, o dynamic linker passa o controle para o programa. A partir daí, as sh
 - **Executable object file:** tem formato parecido com o do relocatable object file, mas já está relocado, não tem seções `.rel` e o cabeçalho ELF guarda o **entry point**, o endereço da primeira instrução. A **tabela de cabeçalhos de programa** diz quais partes do arquivo viram os segmentos de código e de dados na memória.
 - **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e stack, com o kernel no topo. Por causa do **ASLR**, os endereços dessas regiões mudam a cada execução, o que dificulta ataques, mas a ordem delas é sempre a mesma.
 - **Dynamic linking:** com **shared libraries** (`.so`), o código da biblioteca não é copiado para o executável. O linker faz só parte do trabalho, e o **dynamic linker** (`ld-linux.so`) termina o linking quando o programa é carregado. Assim, uma única cópia da biblioteca no disco e na memória serve a todos os programas, e atualizá-la não exige refazer o linking deles.
+- **Carregar shared libraries durante a execução:** o próprio programa pode abrir uma shared library enquanto roda, com `dlopen`, pegar o endereço de uma função com `dlsym` e chamá-la. É assim que servidores web carregam funções sob demanda e programas recebem atualizações só trocando a biblioteca.
 
 ---
 
