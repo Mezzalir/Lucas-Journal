@@ -508,6 +508,27 @@ O linker percorre cada seção e cada entrada de relocação dela. Para cada ent
 - **Referência relativa ao PC:** o linker escreve a **distância** entre a instrução e o símbolo. Na execução, o processador soma essa distância ao PC e chega ao símbolo. O addend serve para compensar o fato de que, quando a instrução executa, o PC já aponta para a instrução seguinte.
 - **Referência absoluta:** o linker escreve o **endereço** do símbolo direto, e a instrução o usa sem nenhum cálculo.
 
+## Executable object files
+
+Depois do linking, o programa, que começou como alguns arquivos de texto em C, virou um único arquivo binário com tudo o que é preciso para ser carregado na memória e rodar.
+
+![Formato de um executable object file ELF típico: cabeçalho ELF, tabela de cabeçalhos de segmento, as seções .init, .text, .rodata, .data, .bss, .symtab, .debug, .line, .strtab e a tabela de cabeçalhos de seção (CS:APP, Figura 7.13)](02.png)
+
+**O formato de um executable object file é parecido com o de um relocatable object file.** O cabeçalho ELF descreve o formato geral do arquivo e também guarda o **entry point**, o endereço da primeira instrução que vai ser executada quando o programa rodar. As diferenças em relação ao relocatable object file são:
+
+- **As seções `.text`, `.rodata` e `.data` já foram relocadas** para os endereços que vão ter na memória durante a execução.
+- **Existe uma seção `.init`**, com uma pequena função `_init`, chamada pelo código de inicialização do programa.
+- **Não existem seções `.rel`**, porque o executável já está totalmente ligado e não há mais nada para corrigir.
+
+O executável foi feito para ser fácil de carregar: pedaços contíguos do arquivo correspondem a pedaços contíguos da memória, os **segmentos**. Quem descreve essa correspondência é a **tabela de cabeçalhos de programa** (*program header table*), que dá para ver com `objdump -p`. No exemplo, ela tem dois segmentos:
+
+- **Segmento de código** (leitura e execução): contém o cabeçalho ELF, a tabela de cabeçalhos de programa e as seções `.init`, `.text` e `.rodata`.
+- **Segmento de dados** (leitura e escrita): contém a seção `.data` e a `.bss`. A `.bss` não ocupa espaço no arquivo, então a parte do segmento que corresponde a ela é preenchida com zeros quando o programa é carregado.
+
+As seções `.symtab`, `.debug`, `.line` e `.strtab` ficam no arquivo, mas **não são carregadas na memória**.
+
+Para cada segmento, o linker escolhe um endereço inicial que fique **alinhado** com a posição do segmento dentro do arquivo: os dois precisam ter o mesmo resto na divisão pelo alinhamento indicado no cabeçalho, que no exemplo é 2 MB. Isso é uma otimização que permite copiar os segmentos do arquivo para a memória de forma eficiente, por causa do jeito como a memória virtual é organizada, em blocos grandes e contíguos com tamanho potência de 2 (assunto do capítulo 9).
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -525,6 +546,7 @@ O linker percorre cada seção e cada entrada de relocação dela. Para cada ent
 - **O que o linker faz:** junta os módulos em um executável em duas etapas. Na **resolução de símbolos**, liga cada nome usado à sua definição, que pode estar em outro módulo. Na **relocação**, decide o endereço final de cada coisa e corrige todas as referências.
 - **Biblioteca estática** (`.a`): um pacote com vários relocatable object files, como a `libc.a`. O linker copia para o executável só os módulos que o programa usa. Como o linker lê os arquivos da esquerda para a direita, **as bibliotecas devem vir no fim do comando**, depois dos arquivos que usam as funções delas.
 - **Relocação:** para cada referência cujo endereço não conhece, o montador deixa uma **entrada de relocação**. Depois de decidir os endereços, o linker usa essas entradas para corrigir o código: referências **relativas ao PC** (como o `call`) recebem a distância até o símbolo, e referências **absolutas** recebem o endereço dele.
+- **Executable object file:** tem formato parecido com o do relocatable object file, mas já está relocado, não tem seções `.rel` e o cabeçalho ELF guarda o **entry point**, o endereço da primeira instrução. A **tabela de cabeçalhos de programa** diz quais partes do arquivo viram os segmentos de código e de dados na memória.
 
 ---
 
