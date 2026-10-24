@@ -254,49 +254,21 @@ linux> readelf -s main.o
 - **`array`:** um dado global de 8 bytes (dois `int`), no início da seção 3, que é a `.data`.
 - **`sum`:** está como `UND` (UNDEF), porque o `main.o` usa `sum`, mas não a define. É o linker que vai encontrar a definição em `sum.o`.
 
-## Resolução de símbolos
+### Resolução de símbolos
 
-O linker resolve cada referência a um símbolo associando-a a exatamente uma definição, procurando nas tabelas de símbolos dos relocatable object files que recebeu.
+O linker liga cada referência a exatamente uma definição, procurando nas tabelas de símbolos dos object files. Para **símbolos locais** é fácil, porque a definição está no próprio módulo. Para **símbolos globais**, o compilador só assume que a definição está em outro módulo e deixa o problema para o linker. Se o linker não a encontra em nenhum arquivo, ele dá erro, como o `undefined reference to 'foo'` de uma função que foi declarada mas nunca definida.
 
-Para **símbolos locais**, isso é fácil: a definição está no mesmo módulo da referência, o compilador só permite uma definição de cada símbolo local por módulo, e as variáveis locais `static` já recebem nomes únicos.
+O outro problema é quando vários módulos definem um símbolo global com o mesmo nome.
 
-Para **símbolos globais**, é mais complicado. Quando o compilador encontra um símbolo que não está definido no arquivo atual, ele assume que a definição está em outro módulo, cria uma entrada na tabela de símbolos e deixa o problema para o linker. Se o linker não encontrar a definição em nenhum dos arquivos, ele para com um erro. Por exemplo:
+#### Símbolos com o mesmo nome: fortes e fracos
 
-```c
-void foo(void);
+Cada símbolo global é **forte** (funções e variáveis globais inicializadas) ou **fraco** (variáveis globais não inicializadas). O linker segue três regras:
 
-int main() {
-    foo();
-    return 0;
-}
-```
+1. **Vários fortes com o mesmo nome:** erro (`multiple definition`).
+2. **Um forte e vários fracos:** escolhe o forte.
+3. **Vários fracos:** escolhe qualquer um.
 
-O compilador aceita esse código sem reclamar, porque `foo` foi declarada. Mas como ela nunca foi definida, o linker falha:
-
-```
-linux> gcc -Wall -Og -o linkerror linkerror.c
-/tmp/ccSz5uti.o: In function 'main':
-/tmp/ccSz5uti.o(.text+0x7): undefined reference to 'foo'
-```
-
-O outro problema é quando **vários módulos definem um símbolo global com o mesmo nome**. Aí o linker precisa dar erro ou escolher uma das definições e descartar as outras.
-
-### Símbolos com o mesmo nome: fortes e fracos
-
-Para decidir, o compilador marca cada símbolo global como **forte** ou **fraco**:
-
-- **Fortes:** funções e variáveis globais **inicializadas**.
-- **Fracos:** variáveis globais **não inicializadas**.
-
-Com isso, o linker do Linux segue três regras:
-
-1. **Dois ou mais símbolos fortes com o mesmo nome:** erro.
-2. **Um símbolo forte e vários fracos com o mesmo nome:** o linker escolhe o forte.
-3. **Vários símbolos fracos com o mesmo nome:** o linker escolhe qualquer um deles.
-
-A regra 1 é a mais tranquila, porque o linker avisa. Se dois arquivos definem `main`, ou se dois arquivos fazem `int x = 15213;`, o resultado é um erro como `multiple definition of 'main'`.
-
-As regras 2 e 3 são as perigosas, porque o linker escolhe uma definição **sem avisar**:
+As regras 2 e 3 são perigosas porque o linker escolhe **sem avisar**:
 
 ```c
 /* foo3.c */
@@ -323,30 +295,11 @@ void f()
 }
 ```
 
-O `x` de `foo3.c` é forte e o de `bar3.c` é fraco, então pela regra 2 os dois arquivos acabam usando o mesmo `x`. Quem escreveu `main` esperava imprimir 15213, mas a função `f` de outro arquivo alterou a variável:
+O `x` forte de `foo3.c` e o fraco de `bar3.c` viram a mesma variável, então `f` altera o `x` do `main` e o programa imprime 15212 em vez de 15213. Com tipos diferentes é pior: se um arquivo define `x` como `int` e o outro como `double`, a escrita de 8 bytes do `double` sobrescreve também a variável vizinha na memória. Para se proteger, o livro recomenda compilar com `-fno-common` ou `-Werror`.
 
-```
-linux> gcc -o foobar3 foo3.c bar3.c
-linux> ./foobar3
-x = 15212
-```
+É por isso que variáveis globais não inicializadas iam para COMMON: o compilador não sabe se outro módulo define a mesma variável e deixa a decisão para o linker. **Desde o GCC 10, o padrão é `-fno-common`**, então hoje esse exemplo dá `multiple definition of 'x'` em vez de escolher em silêncio. O comportamento do livro só aparece com `-fcommon`.
 
-Com dois `int x;` não inicializados (regra 3), acontece a mesma coisa.
-
-O caso mais traiçoeiro é quando as definições têm **tipos diferentes**. No exemplo do livro, `foo5.c` tem `int y = 15212;` e `int x = 15213;`, e `bar5.c` tem `double x;` e uma função que faz `x = -0.0`. Como o linker escolhe o `x` forte de `foo5.c`, que é um `int` de 4 bytes, mas a função de `bar5.c` acha que `x` é um `double` de 8 bytes, a atribuição escreve por cima de `x` **e de `y`**, que estava logo depois na memória:
-
-```
-linux> ./foobar5
-x = 0x0 y = 0x80000000
-```
-
-O linker só dá um aviso sobre alinhamento, e o erro aparece longe de onde foi causado. Em um programa com centenas de módulos, um bug assim é muito difícil de achar. Para se proteger, o livro recomenda compilar com `-fno-common`, que transforma definições múltiplas em erro, ou com `-Werror`, que transforma todos os avisos em erros.
-
-Isso explica a convenção de COMMON e `.bss` vista na seção anterior. Quando o compilador encontra uma variável global não inicializada (um símbolo fraco), ele não sabe se outro módulo também define essa variável, nem qual definição o linker vai escolher. Por isso, deixa a decisão para o linker e coloca a variável em COMMON. Já uma variável inicializada com zero é forte e, pela regra 1, tem que ser única, então pode ir direto para `.bss`.
-
-**Isso mudou no GCC atual.** Desde o GCC 10, o padrão é `-fno-common`, então variáveis globais não inicializadas deixaram de ser fracas na prática: compilando o exemplo `foo3.c` e `bar3.c` hoje, o linker dá erro (`multiple definition of 'x'`) em vez de escolher em silêncio. O comportamento do livro só aparece compilando com `-fcommon`.
-
-### Linking com bibliotecas estáticas
+## Bibliotecas estáticas
 
 Até aqui, o linker recebia só os object files do próprio programa. Na prática, todo sistema também permite empacotar vários object files relacionados em um único arquivo, a **biblioteca estática** (*static library*), que também é passada para o linker. A vantagem é que o linker **copia para o executável só os módulos da biblioteca que o programa realmente usa**.
 
@@ -364,7 +317,7 @@ linux> gcc main.c /usr/lib/libm.a /usr/lib/libc.a
 
 (Na verdade, o `gcc` já passa a `libc.a` sozinho, então ela nem precisa aparecer no comando.)
 
-#### Exemplo: a biblioteca `libvector`
+### Exemplo: a biblioteca `libvector`
 
 O livro cria uma biblioteca com duas funções, `addvec` (soma dois vetores) e `multvec` (multiplica dois vetores), cada uma no seu arquivo. Cada uma também conta quantas vezes foi chamada, em uma variável global:
 
@@ -435,7 +388,7 @@ Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida
 
 ![Linking com bibliotecas estáticas: main2.o, addvec.o (da libvector.a) e printf.o (da libc.a) entram no linker, que gera o executável prog2c (CS:APP, Figura 7.8)](01.png)
 
-#### Resumindo: o que é uma biblioteca estática
+### Resumindo: o que é uma biblioteca estática
 
 Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. O `s` do `ar rcs` é o que cria esse índice.
 
