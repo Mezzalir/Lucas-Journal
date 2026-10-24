@@ -515,6 +515,20 @@ A ideia é criar uma **função wrapper** com o mesmo protótipo da função alv
 linux> LD_PRELOAD="./mymalloc.so" /usr/bin/uptime
 ```
 
+## Ferramentas para manipular object files
+
+O Linux tem várias ferramentas para entender e mexer em object files. A maioria vem do pacote **GNU binutils**, disponível em qualquer distribuição:
+
+- **`ar`:** cria bibliotecas estáticas e insere, remove, lista e extrai os módulos delas.
+- **`strings`:** lista todas as strings imprimíveis de um object file.
+- **`strip`:** apaga a tabela de símbolos de um object file.
+- **`nm`:** lista os símbolos definidos na tabela de símbolos.
+- **`size`:** lista os nomes e os tamanhos das seções.
+- **`readelf`:** mostra a estrutura completa de um object file, inclusive tudo o que está no cabeçalho ELF. Faz tudo o que o `size` e o `nm` fazem.
+- **`objdump`:** a "mãe de todas as ferramentas binárias". Mostra qualquer informação de um object file, e o uso mais comum é desmontar as instruções da seção `.text`.
+
+Para shared libraries, existe também o **`ldd`**, que lista as shared libraries de que um executável precisa para rodar.
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -538,6 +552,7 @@ linux> LD_PRELOAD="./mymalloc.so" /usr/bin/uptime
 - **Carregar shared libraries durante a execução:** o próprio programa pode abrir uma shared library enquanto roda, com `dlopen`, pegar o endereço de uma função com `dlsym` e chamá-la. É assim que servidores web carregam funções sob demanda e programas recebem atualizações só trocando a biblioteca.
 - **PIC:** código compilado com `-fpic`, que funciona em qualquer endereço sem ser modificado, e por isso uma única cópia pode ser usada por todos os processos. Variáveis e funções de outros módulos são acessadas pela **GOT**, uma tabela no segmento de dados que o dynamic linker preenche. Nas funções, o endereço só é resolvido na primeira chamada (**lazy binding**), através da **PLT**.
 - **Library interpositioning:** interceptar chamadas a funções de bibliotecas com um **wrapper**, na compilação (macros), no linking (`--wrap`) ou na execução (`LD_PRELOAD`), que funciona com qualquer executável.
+- **Ferramentas:** `ar` (bibliotecas estáticas), `strings`, `strip`, `nm` (símbolos), `size` (seções), `readelf` e `objdump` (estrutura completa e desmontagem do código), e `ldd` (shared libraries de que um executável precisa).
 
 ---
 
