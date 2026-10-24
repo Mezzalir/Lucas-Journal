@@ -355,7 +355,7 @@ De baixo para cima:
 - **Pilha do usuário**, que começa no maior endereço permitido ao programa (2⁴⁸ − 1) e cresce para baixo.
 - **Memória do kernel**, acima de tudo, que o programa não consegue acessar.
 
-Guiado pela tabela de cabeçalhos de programa, o loader copia os pedaços do executável para os segmentos de código e de dados e pula para o entry point, que é sempre a função `_start`, definida no object file de sistema `crt1.o`. A `_start` chama a `__libc_start_main` (da `libc.so`), que prepara o ambiente de execução, chama o `main` do programa, trata o valor que ele retorna e, se precisar, devolve o controle ao kernel.
+Quando o loader roda, ele cria uma imagem de memória parecida com a da figura. Guiado pela tabela de cabeçalhos de programa, ele copia pedaços do executable object file para os segmentos de código e de dados. Em seguida, o loader pula para o entry point do programa, que é sempre o endereço da função `_start`. Essa função é definida no object file de sistema `crt1.o` e é a mesma para todos os programas em C. A `_start` chama a *função de inicialização do sistema* (*system startup function*), a `__libc_start_main`, que é definida na `libc.so`. Ela inicializa o ambiente de execução, chama a função `main` do programa, trata o valor que ela retorna e, se necessário, devolve o controle ao kernel.
 
 ### Os endereços mudam a cada execução (ASLR)
 
