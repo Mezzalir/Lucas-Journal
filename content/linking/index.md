@@ -480,6 +480,41 @@ linux> gcc -rdynamic -o prog2r dll.c -ldl
 
 O `-rdynamic` deixa os símbolos globais do próprio executável disponíveis para as bibliotecas abertas com `dlopen`, e o `-ldl` liga a biblioteca que tem essas funções. Nas versões atuais da glibc, elas já fazem parte da `libc`, então o `-ldl` não é mais necessário, mas continua funcionando.
 
+## Position-independent code (PIC)
+
+O objetivo das shared libraries é que vários processos usem **a mesma cópia** do código na memória. Uma forma de fazer isso seria reservar para cada biblioteca um pedaço fixo do espaço de endereçamento e sempre carregá-la ali. Só que isso desperdiça espaço (o pedaço fica reservado mesmo quando o processo não usa a biblioteca) e é difícil de administrar: os pedaços não podem se sobrepor, cada versão nova precisa caber no seu lugar, e com centenas de bibliotecas o espaço acaba cheio de buracos inúteis.
+
+A solução dos sistemas modernos é compilar o código das shared libraries de forma que ele **possa ser carregado em qualquer endereço sem que o linker precise modificá-lo**. Esse é o **position-independent code** (PIC), gerado com a opção `-fpic` do `gcc`. Assim, uma única cópia do segmento de código pode ser usada por quantos processos forem necessários (cada processo continua tendo a própria cópia do segmento de dados).
+
+Referências a símbolos do próprio módulo já são PIC naturalmente, porque usam endereçamento relativo ao PC. O problema são as referências a variáveis globais e funções que podem estar **em outro módulo**.
+
+### Referências a dados: a GOT
+
+O truque é que, onde quer que o módulo seja carregado, **o segmento de dados fica sempre à mesma distância do segmento de código**. Então o compilador cria, no início do segmento de dados, a **GOT** (*global offset table*), uma tabela com uma entrada de 8 bytes para cada variável ou função global que o módulo usa. O código acessa a GOT com endereçamento relativo ao PC, que funciona em qualquer posição. Na hora de carregar, o dynamic linker preenche cada entrada da GOT com o endereço real do objeto. O código nunca é alterado: só a GOT, que fica nos dados.
+
+### Chamadas de função: lazy binding com a PLT
+
+Para chamadas a funções de shared libraries, o GCC usa o **lazy binding**: o endereço de cada função só é resolvido **na primeira vez que ela é chamada**. Faz sentido porque um programa costuma usar só algumas das milhares de funções de uma biblioteca como a `libc.so`, então resolver todas no carregamento seria desperdício. A primeira chamada é mais lenta, mas as seguintes custam só um desvio a mais.
+
+Isso funciona com duas tabelas: a GOT e a **PLT** (*procedure linkage table*), que fica no segmento de código e tem uma pequena entrada de código para cada função de biblioteca que o programa chama. O programa nunca chama a função direto, e sim a entrada dela na PLT, que pula para o endereço guardado na GOT:
+
+- **Na primeira chamada**, a entrada da GOT ainda aponta de volta para a PLT. A PLT então chama o dynamic linker, que descobre o endereço real da função, **escreve esse endereço na GOT** e passa o controle para a função.
+- **Nas chamadas seguintes**, a GOT já tem o endereço certo, e o pulo da PLT vai direto para a função.
+
+## Library interpositioning
+
+O **library interpositioning** é uma técnica que permite **interceptar chamadas a funções de shared libraries e rodar outro código no lugar**. Com ela, dá para contar quantas vezes uma função é chamada, registrar os argumentos e o retorno dela, ou trocá-la por uma implementação completamente diferente.
+
+A ideia é criar uma **função wrapper** com o mesmo protótipo da função alvo e enganar o sistema para que ele chame o wrapper em vez dela. O wrapper normalmente faz o que precisa, chama a função original e devolve o resultado. O livro usa como exemplo um programa que chama `malloc` e `free`, e o objetivo é imprimir cada chamada. Isso pode ser feito em três momentos:
+
+- **Na compilação:** um `malloc.h` local define macros que trocam `malloc` e `free` por `mymalloc` e `myfree`. Compilando com `-I.`, o pré-processador usa esse arquivo antes do do sistema. Exige ter o código-fonte do programa.
+- **No linking:** a opção `--wrap f` do linker faz as referências a `f` irem para `__wrap_f`, e as referências a `__real_f` irem para a `f` original. Com o `gcc`, fica `-Wl,--wrap,malloc`. Exige ter os relocatable object files.
+- **Na execução:** a variável de ambiente **`LD_PRELOAD`** faz o dynamic linker procurar primeiro nas bibliotecas listadas nela, antes de qualquer outra. Basta criar uma shared library com as próprias versões de `malloc` e `free`, que acham a original com `dlsym(RTLD_NEXT, "malloc")`. Exige só o executável, então **funciona com qualquer programa**, até os do sistema:
+
+```
+linux> LD_PRELOAD="./mymalloc.so" /usr/bin/uptime
+```
+
 ## Resumo
 
 - **Object file:** é o arquivo que o compilador gera a partir de um `.c`. Ele já tem o código em linguagem de máquina, mas ainda não é um programa pronto. Cada object file também é chamado de **módulo**: no exemplo deste post, `main.o` e `sum.o` são dois módulos.
@@ -501,6 +536,8 @@ O `-rdynamic` deixa os símbolos globais do próprio executável disponíveis pa
 - **Carregamento:** ao rodar `./prog`, o shell chama o **loader**, que copia o código e os dados do executável para a memória e pula para o entry point (`_start`), que acaba chamando o `main`. Na memória, o programa fica organizado em segmento de código, segmento de dados, heap, shared libraries e stack, com o kernel no topo. Por causa do **ASLR**, os endereços dessas regiões mudam a cada execução, o que dificulta ataques, mas a ordem delas é sempre a mesma.
 - **Dynamic linking:** com **shared libraries** (`.so`), o código da biblioteca não é copiado para o executável. O linker faz só parte do trabalho, e o **dynamic linker** (`ld-linux.so`) termina o linking quando o programa é carregado. Assim, uma única cópia da biblioteca no disco e na memória serve a todos os programas, e atualizá-la não exige refazer o linking deles.
 - **Carregar shared libraries durante a execução:** o próprio programa pode abrir uma shared library enquanto roda, com `dlopen`, pegar o endereço de uma função com `dlsym` e chamá-la. É assim que servidores web carregam funções sob demanda e programas recebem atualizações só trocando a biblioteca.
+- **PIC:** código compilado com `-fpic`, que funciona em qualquer endereço sem ser modificado, e por isso uma única cópia pode ser usada por todos os processos. Variáveis e funções de outros módulos são acessadas pela **GOT**, uma tabela no segmento de dados que o dynamic linker preenche. Nas funções, o endereço só é resolvido na primeira chamada (**lazy binding**), através da **PLT**.
+- **Library interpositioning:** interceptar chamadas a funções de bibliotecas com um **wrapper**, na compilação (macros), no linking (`--wrap`) ou na execução (`LD_PRELOAD`), que funciona com qualquer executável.
 
 ---
 
