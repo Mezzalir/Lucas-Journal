@@ -447,6 +447,8 @@ Quando o linker roda, ele percebe que `main2.o` usa `addvec`, que está definida
 - `addvec.o`, vindo da `libvector.a`;
 - `printf.o` e os módulos que ele usa, vindos da `libc.a`.
 
+![Linking com bibliotecas estáticas: main2.o, addvec.o (da libvector.a) e printf.o (da libc.a) entram no linker, que gera o executável prog2c (CS:APP, Figura 7.8)](01.png)
+
 #### Resumindo: o que é uma biblioteca estática
 
 Uma **biblioteca estática** é um arquivo `.a` que junta vários relocatable object files (`.o`) em um só, junto com um índice que diz qual `.o` define cada função. O `s` do `ar rcs` é o que cria esse índice.
