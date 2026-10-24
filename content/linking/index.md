@@ -229,31 +229,6 @@ Além das seções normais, existem três **pseudosseções**, que só aparecem 
 - **UNDEF:** símbolos usados no arquivo, mas definidos em outro lugar (os externos).
 - **COMMON:** variáveis globais não inicializadas que ainda não receberam espaço.
 
-A diferença entre COMMON e `.bss` é sutil. O livro descreve esta convenção do GCC:
-
-| Pseudosseção/seção | O que vai para ela                                                        |
-| ------------------ | ------------------------------------------------------------------------- |
-| COMMON             | Variáveis globais não inicializadas                                       |
-| `.bss`             | Variáveis `static` não inicializadas, e globais ou `static` inicializadas com zero |
-
-O motivo tem a ver com a forma como o linker resolve símbolos com o mesmo nome em arquivos diferentes, que é o assunto da próxima seção. Mas vale notar que **isso mudou desde o livro**: a partir do GCC 10, o padrão passou a ser a opção `-fno-common`, e as variáveis globais não inicializadas vão direto para `.bss`. Para ter o comportamento antigo, é preciso compilar com `-fcommon`.
-
-### Vendo a tabela de símbolos do exemplo
-
-O programa `readelf` mostra o conteúdo de object files. As últimas entradas da tabela de símbolos do `main.o` são:
-
-```
-linux> readelf -s main.o
-   Num:    Value          Size Type    Bind   Vis      Ndx Name
-     3: 0000000000000000    26 FUNC    GLOBAL DEFAULT    1 main
-     4: 0000000000000000     8 OBJECT  GLOBAL DEFAULT    3 array
-     5: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND sum
-```
-
-- **`main`:** uma função global de 26 bytes, no início (`Value` 0) da seção 1, que é a `.text`. No livro ela tem 24 bytes; o tamanho muda conforme a versão do compilador.
-- **`array`:** um dado global de 8 bytes (dois `int`), no início da seção 3, que é a `.data`.
-- **`sum`:** está como `UND` (UNDEF), porque o `main.o` usa `sum`, mas não a define. É o linker que vai encontrar a definição em `sum.o`.
-
 ### Resolução de símbolos
 
 O linker liga cada referência a exatamente uma definição, procurando nas tabelas de símbolos dos object files. Para **símbolos locais** é fácil, porque a definição está no próprio módulo. Para **símbolos globais**, o compilador só assume que a definição está em outro módulo e deixa o problema para o linker. Se o linker não a encontra em nenhum arquivo, ele dá erro, como o `undefined reference to 'foo'` de uma função que foi declarada mas nunca definida.
