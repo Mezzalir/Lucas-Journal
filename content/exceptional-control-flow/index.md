@@ -1,6 +1,6 @@
 +++
 date = '2026-10-26T16:25:59-03:00'
-draft = true
+draft = false
 title = 'Exceptional Control Flow'
 type = 'blog'
 tags = ['Arquitetura', 'Sistemas Operacionais', 'CSAPP']
@@ -738,6 +738,862 @@ int parseline(char *buf, char **argv)
 ```
 
 Esse shell tem um defeito: **ele não colhe os filhos que rodam em segundo plano**, que ficam como zumbis. Para corrigir isso é preciso usar sinais, o assunto da próxima seção.
+
+## Sinais
+
+Até aqui, vimos como o hardware e o software cooperam para oferecer o mecanismo básico de exceções, e como o sistema operacional usa exceções para fazer trocas de contexto entre processos. Agora vamos ver uma forma de ECF de mais alto nível, feita em software: o **sinal** do Linux, que permite que processos e o kernel interrompam outros processos.
+
+Um **sinal** é uma pequena mensagem que avisa um processo de que algum tipo de evento aconteceu no sistema. O Linux tem 30 tipos de sinais:
+
+| Número | Nome | Ação padrão | Evento |
+|---|---|---|---|
+| 1 | `SIGHUP` | Terminar | O terminal foi desligado |
+| 2 | `SIGINT` | Terminar | Interrupção pelo teclado (`Ctrl+C`) |
+| 3 | `SIGQUIT` | Terminar | Saída pelo teclado |
+| 4 | `SIGILL` | Terminar | Instrução ilegal |
+| 5 | `SIGTRAP` | Terminar e fazer dump de core | Trap de rastreamento |
+| 6 | `SIGABRT` | Terminar e fazer dump de core | Sinal de abort, vindo da função `abort` |
+| 7 | `SIGBUS` | Terminar | Erro de barramento |
+| 8 | `SIGFPE` | Terminar e fazer dump de core | Exceção de ponto flutuante |
+| 9 | `SIGKILL` | Terminar (não pode ser capturado nem ignorado) | Matar o programa |
+| 10 | `SIGUSR1` | Terminar | Sinal 1 definido pelo usuário |
+| 11 | `SIGSEGV` | Terminar e fazer dump de core | Referência inválida à memória (*segfault*) |
+| 12 | `SIGUSR2` | Terminar | Sinal 2 definido pelo usuário |
+| 13 | `SIGPIPE` | Terminar | Escrita em um pipe sem leitor |
+| 14 | `SIGALRM` | Terminar | Sinal de timer da função `alarm` |
+| 15 | `SIGTERM` | Terminar | Sinal de término por software |
+| 16 | `SIGSTKFLT` | Terminar | Falha de pilha no coprocessador |
+| 17 | `SIGCHLD` | Ignorar | Um processo filho parou ou terminou |
+| 18 | `SIGCONT` | Ignorar | Continuar o processo, se estiver parado |
+| 19 | `SIGSTOP` | Parar até o próximo `SIGCONT` (não pode ser capturado nem ignorado) | Sinal de parada que não vem do terminal |
+| 20 | `SIGTSTP` | Parar até o próximo `SIGCONT` | Sinal de parada vindo do terminal (`Ctrl+Z`) |
+| 21 | `SIGTTIN` | Parar até o próximo `SIGCONT` | Processo em segundo plano leu do terminal |
+| 22 | `SIGTTOU` | Parar até o próximo `SIGCONT` | Processo em segundo plano escreveu no terminal |
+| 23 | `SIGURG` | Ignorar | Condição urgente em um socket |
+| 24 | `SIGXCPU` | Terminar | Limite de tempo de CPU excedido |
+| 25 | `SIGXFSZ` | Terminar | Limite de tamanho de arquivo excedido |
+| 26 | `SIGVTALRM` | Terminar | Timer virtual expirou |
+| 27 | `SIGPROF` | Terminar | Timer de profiling expirou |
+| 28 | `SIGWINCH` | Ignorar | O tamanho da janela mudou |
+| 29 | `SIGIO` | Terminar | I/O possível em um descritor |
+| 30 | `SIGPWR` | Terminar | Falha de energia |
+
+*"Fazer dump de core" é um termo histórico, de quando a memória principal era feita de uma tecnologia chamada core memory, e significa gravar no disco uma imagem dos segmentos de código e de dados do programa.*
+
+Cada tipo de sinal corresponde a algum evento do sistema. As exceções de hardware de baixo nível são tratadas pelos exception handlers do kernel e normalmente não seriam visíveis para os processos do usuário. **Os sinais são o mecanismo que expõe essas exceções para os processos.** Por exemplo:
+
+- Se um processo tenta dividir por zero, o kernel envia a ele um `SIGFPE`.
+- Se executa uma instrução ilegal, recebe um `SIGILL`.
+- Se faz um acesso inválido à memória, recebe um `SIGSEGV`.
+
+Outros sinais correspondem a eventos de software de mais alto nível, no kernel ou em outros processos. Digitar `Ctrl+C` com um processo rodando em primeiro plano faz o kernel enviar um `SIGINT` para cada processo do grupo de primeiro plano. Um processo pode forçar o término de outro enviando um `SIGKILL`. E quando um filho termina ou para, o kernel envia um `SIGCHLD` para o pai.
+
+### Terminologia de sinais
+
+A transferência de um sinal para o processo de destino acontece em duas etapas:
+
+- **Envio.** O kernel **envia** (ou **entrega**) um sinal a um processo atualizando algum estado no contexto desse processo. Isso acontece por um de dois motivos: o kernel detectou um evento do sistema, como uma divisão por zero ou o término de um filho, ou um processo chamou a função `kill` para pedir explicitamente ao kernel que envie o sinal. Um processo pode enviar um sinal para si mesmo.
+- **Recebimento.** O processo de destino **recebe** o sinal quando o kernel o obriga a reagir à entrega. O processo pode ignorar o sinal, terminar ou **capturá-lo**, executando uma função do usuário chamada **signal handler**.
+
+![Tratamento de um sinal: (1) o processo recebe o sinal durante a instrução atual; (2) o controle passa para o signal handler; (3) o handler roda; (4) o handler volta para a próxima instrução (CS:APP, Figura 8.27)](15.png)
+
+Um sinal que foi enviado, mas ainda não foi recebido, é um **sinal pendente**. **Em cada momento, pode existir no máximo um sinal pendente de cada tipo.** Se um processo já tem um sinal pendente do tipo *k*, os próximos sinais do tipo *k* enviados a ele **não entram em fila: são simplesmente descartados**.
+
+Um processo também pode **bloquear** o recebimento de certos sinais. Um sinal bloqueado ainda pode ser entregue, mas o sinal pendente resultante só vai ser recebido quando o processo desbloquear aquele tipo. Um sinal pendente é recebido no máximo uma vez.
+
+Para cada processo, o kernel guarda os sinais pendentes no vetor de bits **`pending`** e os bloqueados no vetor de bits **`blocked`** (também chamado de *signal mask*). O kernel liga o bit *k* de `pending` quando um sinal do tipo *k* é entregue e desliga quando ele é recebido.
+
+### Enviando sinais
+
+Todos os mecanismos que o Unix oferece para enviar sinais se baseiam na ideia de **grupo de processos**.
+
+#### Grupos de processos
+
+Todo processo pertence a exatamente um grupo de processos, identificado por um inteiro positivo, o **ID do grupo**. A função `getpgrp` devolve o ID do grupo do processo atual:
+
+```c
+#include <unistd.h>
+
+pid_t getpgrp(void);
+```
+
+Por padrão, um filho pertence ao mesmo grupo do pai. Um processo pode mudar o grupo dele mesmo ou de outro processo com a função `setpgid`:
+
+```c
+#include <unistd.h>
+
+int setpgid(pid_t pid, pid_t pgid);
+```
+
+Ela muda o grupo do processo `pid` para `pgid`. Se `pid` for zero, usa o PID do processo atual. Se `pgid` for zero, usa o PID do processo `pid` como ID do grupo. Por exemplo, se o processo 15213 chamar `setpgid(0, 0)`, ele cria um novo grupo com ID 15213 e entra nele.
+
+#### Com o programa `/bin/kill`
+
+O programa `/bin/kill` envia qualquer sinal para outro processo. O comando abaixo envia o sinal 9 (`SIGKILL`) para o processo 15213:
+
+```
+linux> /bin/kill -9 15213
+```
+
+Um PID negativo faz o sinal ser enviado para todos os processos do grupo. Este comando envia um `SIGKILL` para todos os processos do grupo 15213:
+
+```
+linux> /bin/kill -9 -15213
+```
+
+O caminho completo `/bin/kill` é usado porque alguns shells têm o seu próprio comando `kill` embutido.
+
+#### Pelo teclado
+
+Os shells usam a ideia de **job** para representar os processos criados ao avaliar uma única linha de comando. Em cada momento, existe no máximo um job em **primeiro plano** e zero ou mais em **segundo plano**. Por exemplo, `ls | sort` cria um job em primeiro plano com dois processos ligados por um pipe: um rodando o `ls` e outro o `sort`.
+
+O shell cria um grupo de processos separado para cada job, normalmente com o ID tirado de um dos processos pais do job. Na figura, o processo pai do job em primeiro plano tem PID 20 e ID de grupo 20, e os dois filhos que ele criou também estão no grupo 20:
+
+![Grupos de processos em primeiro e segundo plano: o shell (pid 10) tem um job em primeiro plano (grupo 20, com o processo 20 e os filhos 21 e 22) e dois jobs em segundo plano (grupos 32 e 40) (CS:APP, Figura 8.28)](16.png)
+
+Digitar **`Ctrl+C`** faz o kernel enviar um `SIGINT` para todos os processos do grupo em primeiro plano, o que, por padrão, termina o job. Digitar **`Ctrl+Z`** envia um `SIGTSTP`, que, por padrão, para (suspende) o job.
+
+#### Com a função `kill`
+
+Um processo envia sinais para outros (ou para si mesmo) com a função `kill`:
+
+```c
+#include <sys/types.h>
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+```
+
+- Se `pid > 0`, envia o sinal `sig` para o processo `pid`.
+- Se `pid = 0`, envia para todos os processos do grupo do processo que chamou, incluindo ele mesmo.
+- Se `pid < 0`, envia para todos os processos do grupo |`pid`|.
+
+No exemplo abaixo, o pai usa o `kill` para enviar um `SIGKILL` ao filho:
+
+```c
+#include "csapp.h"
+
+int main()
+{
+    pid_t pid;
+
+    /* Child sleeps until SIGKILL signal received, then dies */
+    if ((pid = Fork()) == 0) {
+        Pause(); /* Wait for a signal to arrive */
+        printf("control should never reach here!\n");
+        exit(0);
+    }
+
+    /* Parent sends a SIGKILL signal to a child */
+    Kill(pid, SIGKILL);
+    exit(0);
+}
+```
+
+#### Com a função `alarm`
+
+Um processo pode enviar sinais `SIGALRM` para si mesmo com a função `alarm`:
+
+```c
+#include <unistd.h>
+
+unsigned int alarm(unsigned int secs);
+```
+
+Ela faz o kernel enviar um `SIGALRM` ao processo daqui a `secs` segundos. Se `secs` for 0, nenhum alarme novo é agendado. Em todo caso, a chamada cancela qualquer alarme pendente e devolve quantos segundos faltavam para ele, ou 0 se não havia nenhum.
+
+### Recebendo sinais
+
+Quando o kernel passa um processo *p* do modo kernel para o modo usuário (por exemplo, ao voltar de uma system call ou ao terminar uma troca de contexto), ele verifica o conjunto de **sinais pendentes não bloqueados** de *p* (`pending & ~blocked`). Se o conjunto estiver vazio, que é o caso mais comum, o kernel passa o controle para a próxima instrução, \(I_{next}\). Se não estiver, o kernel escolhe algum sinal *k* do conjunto (normalmente o menor) e obriga *p* a recebê-lo. O recebimento dispara alguma ação e, quando ela termina, o controle volta para \(I_{next}\).
+
+Cada tipo de sinal tem uma **ação padrão**, que é uma destas:
+
+- O processo termina.
+- O processo termina e faz dump de core.
+- O processo para até ser retomado por um `SIGCONT`.
+- O processo ignora o sinal.
+
+A ação padrão do `SIGKILL`, por exemplo, é terminar o processo, e a do `SIGCHLD` é ignorar. Um processo pode mudar a ação padrão de um sinal com a função `signal`. As únicas exceções são `SIGSTOP` e `SIGKILL`, cujas ações não podem ser mudadas.
+
+```c
+#include <signal.h>
+typedef void (*sighandler_t)(int);
+
+sighandler_t signal(int signum, sighandler_t handler);
+```
+
+A função `signal` muda a ação do sinal `signum` de uma de três formas:
+
+- Se `handler` for `SIG_IGN`, os sinais do tipo `signum` são ignorados.
+- Se `handler` for `SIG_DFL`, a ação volta a ser a padrão.
+- Senão, `handler` é o endereço de uma função do usuário, o **signal handler**, que vai ser chamada sempre que o processo receber um sinal do tipo `signum`.
+
+Passar o endereço de um handler para o `signal` é **instalar** o handler. A chamada do handler é **capturar** o sinal, e a execução dele é **tratar** o sinal. O handler recebe como argumento o número do sinal, o que permite usar a mesma função para vários tipos. Quando o handler executa o `return`, o controle (normalmente) volta para a instrução em que o processo foi interrompido. O "normalmente" é porque, em alguns sistemas, system calls interrompidas retornam na hora com erro.
+
+O programa abaixo captura o `SIGINT` enviado pelo `Ctrl+C`. Em vez de terminar na hora, que é a ação padrão, ele imprime uma mensagem e só então termina:
+
+```c
+#include "csapp.h"
+
+void sigint_handler(int sig) /* SIGINT handler */
+{
+    printf("Caught SIGINT!\n");
+    exit(0);
+}
+
+int main()
+{
+    /* Install the SIGINT handler */
+    if (signal(SIGINT, sigint_handler) == SIG_ERR)
+        unix_error("signal error");
+
+    pause(); /* Wait for the receipt of a signal */
+
+    return 0;
+}
+```
+
+Signal handlers também podem ser interrompidos por outros handlers. Na figura, o programa principal captura o sinal *s*, que o interrompe e passa o controle para o handler *S*. Enquanto *S* roda, o programa captura um sinal *t* ≠ *s*, que interrompe *S* e passa o controle para o handler *T*. Quando *T* retorna, *S* continua de onde parou e, quando *S* retorna, o programa principal continua:
+
+![Handlers podem ser interrompidos por outros handlers: o programa principal é interrompido pelo sinal s e vai para o handler S, que é interrompido pelo sinal t e vai para o handler T; T volta para S, e S volta para o programa principal (CS:APP, Figura 8.31)](17.png)
+
+### Bloqueando e desbloqueando sinais
+
+O Linux tem dois mecanismos para bloquear sinais:
+
+- **Implícito.** Por padrão, o kernel bloqueia os sinais pendentes do mesmo tipo do que está sendo tratado por um handler. Na figura anterior, se outro sinal *s* chegar enquanto o handler *S* roda, ele fica pendente e só é recebido depois que *S* retornar.
+- **Explícito.** O programa pode bloquear e desbloquear sinais com a função `sigprocmask` e suas auxiliares.
+
+```c
+#include <signal.h>
+
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int sigemptyset(sigset_t *set);
+int sigfillset(sigset_t *set);
+int sigaddset(sigset_t *set, int signum);
+int sigdelset(sigset_t *set, int signum);
+int sigismember(const sigset_t *set, int signum);
+```
+
+O `sigprocmask` muda o conjunto de sinais bloqueados (o vetor `blocked`). O comportamento depende de `how`:
+
+- **`SIG_BLOCK`:** acrescenta os sinais de `set` aos bloqueados.
+- **`SIG_UNBLOCK`:** tira os sinais de `set` dos bloqueados.
+- **`SIG_SETMASK`:** os bloqueados passam a ser exatamente `set`.
+
+Se `oldset` não for `NULL`, o conjunto anterior é guardado nele. As outras funções manipulam conjuntos de sinais: `sigemptyset` esvazia o conjunto, `sigfillset` coloca todos os sinais nele, `sigaddset` acrescenta um, `sigdelset` tira um, e `sigismember` diz se um sinal está no conjunto.
+
+O trecho abaixo bloqueia o `SIGINT` temporariamente:
+
+```c
+sigset_t mask, prev_mask;
+
+Sigemptyset(&mask);
+Sigaddset(&mask, SIGINT);
+
+/* Block SIGINT and save previous blocked set */
+Sigprocmask(SIG_BLOCK, &mask, &prev_mask);
+// Code region that will not be interrupted by SIGINT
+/* Restore previous blocked set, unblocking SIGINT */
+Sigprocmask(SIG_SETMASK, &prev_mask, NULL);
+```
+
+### Escrevendo signal handlers
+
+Tratar sinais é uma das partes mais traiçoeiras da programação de sistemas no Linux, por três motivos: os handlers rodam **concorrentemente** com o programa principal e compartilham as mesmas variáveis globais, então podem interferir nele e em outros handlers; as regras de como e quando os sinais são recebidos são pouco intuitivas; e sistemas diferentes podem tratar sinais de formas diferentes.
+
+#### Tratamento seguro
+
+Se um handler e o programa principal acessam a mesma estrutura de dados global ao mesmo tempo, o resultado pode ser imprevisível e muitas vezes fatal. Com esse tipo de erro, o programa funciona quase sempre, mas quando falha, falha de forma imprevisível e difícil de repetir, o que torna a depuração terrível. As regras abaixo são conservadoras, mas evitam esses problemas:
+
+- **G0. Mantenha os handlers o mais simples possível.** Por exemplo, o handler pode só ligar uma flag global e retornar, deixando todo o processamento para o programa principal, que verifica (e desliga) a flag de vez em quando.
+- **G1. Chame só funções async-signal-safe.** Uma função **async-signal-safe** (ou só *segura*) pode ser chamada de dentro de um handler, porque é **reentrante** (por exemplo, só acessa variáveis locais) ou porque não pode ser interrompida por um handler. O Linux garante uma lista dessas funções, como `_exit`, `write`, `kill`, `fork`, `execve`, `waitpid`, `sleep` e `sigprocmask`. Funções populares como **`printf`, `sprintf`, `malloc` e `exit` não estão na lista**. A única forma segura de imprimir de dentro de um handler é com a função `write`, e por isso o livro criou o pacote **Sio** (*Safe I/O*):
+
+```c
+#include "csapp.h"
+
+ssize_t sio_putl(long v);
+ssize_t sio_puts(char s[]);
+void sio_error(char s[]);
+```
+
+`sio_putl` e `sio_puts` imprimem um `long` e uma string, e `sio_error` imprime uma mensagem de erro e termina. A implementação usa só `write` e `_exit`, a versão segura do `exit`:
+
+```c
+ssize_t sio_puts(char s[]) /* Put string */
+{
+    return write(STDOUT_FILENO, s, sio_strlen(s));
+}
+
+ssize_t sio_putl(long v) /* Put long */
+{
+    char s[128];
+
+    sio_ltoa(v, s, 10); /* Based on K&R itoa() */
+    return sio_puts(s);
+}
+
+void sio_error(char s[]) /* Put error message and exit */
+{
+    sio_puts(s);
+    _exit(1);
+}
+```
+
+Com isso, o handler de `SIGINT` do exemplo anterior fica seguro assim:
+
+```c
+#include "csapp.h"
+
+void sigint_handler(int sig) /* Safe SIGINT handler */
+{
+    Sio_puts("Caught SIGINT!\n"); /* Safe output */
+    _exit(0);                     /* Safe exit */
+}
+```
+
+- **G2. Salve e restaure o `errno`.** Muitas funções seguras mudam o `errno` quando dão erro, e chamá-las dentro de um handler pode atrapalhar outras partes do programa que dependem dele. A solução é guardar o `errno` em uma variável local quando o handler começa e restaurar antes de ele retornar. Isso só é necessário se o handler retorna, e não se ele termina o processo com `_exit`.
+- **G3. Proteja o acesso a estruturas de dados globais compartilhadas bloqueando todos os sinais.** Acessar uma estrutura de dados normalmente exige uma sequência de instruções. Se essa sequência for interrompida por um handler que mexe na mesma estrutura, ele pode encontrá-la em um estado inconsistente. Bloquear os sinais enquanto acessa a estrutura garante que nenhum handler vai interromper no meio.
+- **G4. Declare as variáveis globais com `volatile`.** Se o handler atualiza uma variável global `g` e a `main` só lê, um compilador otimizador pode achar que `g` nunca muda na `main` e guardar uma cópia dela em um registrador. Aí a `main` nunca veria as mudanças feitas pelo handler. Declarar `volatile int g;` obriga o compilador a ler `g` da memória sempre que ela for usada.
+- **G5. Declare as flags com `sig_atomic_t`.** Para flags que o handler escreve e o programa principal lê e limpa, o C oferece o tipo `sig_atomic_t`, cujas leituras e escritas são **atômicas** (não podem ser interrompidas), porque são feitas com uma única instrução. Assim dá para ler e escrever nelas sem bloquear sinais: `volatile sig_atomic_t flag;`. A garantia vale só para leituras e escritas simples, e não para operações como `flag++` ou `flag = flag + 10`, que podem exigir várias instruções.
+
+Essas regras nem sempre são estritamente necessárias. Se dá para provar que um handler nunca muda o `errno`, não é preciso salvá-lo, e se dá para provar que nenhum `printf` pode ser interrompido por um handler, chamar `printf` no handler é seguro. Mas provar isso em geral é muito difícil, então o mais sensato é seguir as regras.
+
+#### Tratamento correto
+
+Um dos aspectos menos intuitivos dos sinais é que **os sinais pendentes não entram em fila**. Como o vetor `pending` tem exatamente um bit para cada tipo, só pode existir um sinal pendente de cada tipo. Se dois sinais do tipo *k* chegam enquanto *k* está bloqueado (porque o handler de *k* está rodando, por exemplo), o segundo é simplesmente descartado. **A existência de um sinal pendente só indica que pelo menos um sinal chegou.**
+
+Para ver como isso afeta a correção de um programa, imagine uma aplicação parecida com um shell ou um servidor web: o pai cria alguns filhos, que rodam por um tempo e terminam. O pai precisa colhê-los para não deixar zumbis, mas quer continuar livre para fazer outras coisas. Então ele decide colher os filhos em um handler de `SIGCHLD`, já que o kernel envia esse sinal ao pai sempre que um filho termina ou para.
+
+A primeira tentativa instala o handler e cria três filhos. Enquanto isso, o pai espera uma linha do terminal e a processa (o processamento é representado por um loop infinito). Cada vez que recebe um `SIGCHLD`, o handler colhe um filho, faz um trabalho extra de limpeza (representado pelo `Sleep`) e retorna:
+
+```c
+/* WARNING: This code is buggy! */
+
+void handler1(int sig)
+{
+    int olderrno = errno;
+
+    if ((waitpid(-1, NULL, 0)) < 0)
+        sio_error("waitpid error");
+    Sio_puts("Handler reaped child\n");
+    Sleep(1);
+    errno = olderrno;
+}
+
+int main()
+{
+    int i, n;
+    char buf[MAXBUF];
+
+    if (signal(SIGCHLD, handler1) == SIG_ERR)
+        unix_error("signal error");
+
+    /* Parent creates children */
+    for (i = 0; i < 3; i++) {
+        if (Fork() == 0) {
+            printf("Hello from child %d\n", (int)getpid());
+            exit(0);
+        }
+    }
+
+    /* Parent waits for terminal input and then processes it */
+    if ((n = read(STDIN_FILENO, buf, sizeof(buf))) < 0)
+        unix_error("read");
+
+    printf("Parent processing input\n");
+    while (1)
+        ;
+
+    exit(0);
+}
+```
+
+Parece simples, mas a saída mostra um problema:
+
+```
+linux> ./signal1
+Hello from child 14073
+Hello from child 14074
+Hello from child 14075
+Handler reaped child
+Handler reaped child
+CR
+Parent processing input
+```
+
+Três `SIGCHLD` foram enviados, mas só dois foram recebidos, e o pai só colheu dois filhos. Suspendendo o pai com `Ctrl+Z` e rodando `ps`, dá para ver que o filho 14075 virou zumbi (`<defunct>`):
+
+```
+Ctrl+Z
+Suspended
+linux> ps t
+  PID TTY          STAT   TIME COMMAND
+14072 pts/3        T      0:02 ./signal1
+14075 pts/3        Z      0:00 [signal1] <defunct>
+14076 pts/3        R+     0:00 ps t
+```
+
+O que aconteceu:
+
+1. O primeiro sinal é recebido e capturado pelo pai.
+2. Enquanto o handler ainda trata o primeiro, o segundo sinal é entregue e fica pendente. Ele não é recebido porque o handler de `SIGCHLD` bloqueia outros `SIGCHLD`.
+3. Ainda durante o primeiro handler, chega o terceiro sinal. Como já existe um `SIGCHLD` pendente, **o terceiro é descartado**.
+4. Quando o handler retorna, o kernel vê o `SIGCHLD` pendente e faz o pai recebê-lo, rodando o handler pela segunda vez.
+5. Depois disso, não sobra nenhum `SIGCHLD` pendente, e nunca vai sobrar, porque o terceiro se perdeu.
+
+A lição principal: **sinais não servem para contar quantas vezes um evento aconteceu em outros processos**. A correção é lembrar que um sinal pendente só significa que *pelo menos um* sinal chegou desde a última vez. Então o handler precisa colher **o máximo de zumbis possível** cada vez que roda:
+
+```c
+void handler2(int sig)
+{
+    int olderrno = errno;
+
+    while (waitpid(-1, NULL, 0) > 0) {
+        Sio_puts("Handler reaped child\n");
+    }
+    if (errno != ECHILD)
+        Sio_error("waitpid error");
+    Sleep(1);
+    errno = olderrno;
+}
+```
+
+Agora todos os filhos são colhidos:
+
+```
+linux> ./signal2
+Hello from child 15237
+Hello from child 15238
+Hello from child 15239
+Handler reaped child
+Handler reaped child
+Handler reaped child
+CR
+Parent processing input
+```
+
+#### Tratamento portável
+
+Outro problema é que sistemas Unix diferentes tratam sinais de formas diferentes:
+
+- **A semântica da função `signal` varia.** Alguns sistemas Unix antigos voltam a ação do sinal *k* para a padrão depois que *k* é capturado. Nesses sistemas, o handler precisa se reinstalar chamando `signal` toda vez que roda.
+- **System calls podem ser interrompidas.** Chamadas como `read`, `wait` e `accept`, que podem bloquear o processo por muito tempo, são chamadas de **system calls lentas**. Em versões antigas do Unix, quando um handler captura um sinal durante uma delas, a system call não continua depois que o handler retorna: ela volta na hora com erro e `errno` igual a `EINTR`, e o programador precisa reiniciá-la manualmente.
+
+Para resolver isso, o padrão Posix define a função `sigaction`, que permite dizer exatamente qual semântica se quer ao instalar um handler:
+
+```c
+#include <signal.h>
+
+int sigaction(int signum, struct sigaction *act,
+              struct sigaction *oldact);
+```
+
+Como o `sigaction` exige preencher uma estrutura complicada, o livro usa um wrapper chamado `Signal`, que é chamado do mesmo jeito que o `signal`:
+
+```c
+handler_t *Signal(int signum, handler_t *handler)
+{
+    struct sigaction action, old_action;
+
+    action.sa_handler = handler;
+    sigemptyset(&action.sa_mask); /* Block sigs of type being handled */
+    action.sa_flags = SA_RESTART; /* Restart syscalls if possible */
+
+    if (sigaction(signum, &action, &old_action) < 0)
+        unix_error("Signal error");
+    return (old_action.sa_handler);
+}
+```
+
+Ele instala o handler com esta semântica:
+
+- Só os sinais do tipo que está sendo tratado ficam bloqueados.
+- Como em qualquer implementação, os sinais não entram em fila.
+- System calls interrompidas são reiniciadas automaticamente sempre que possível.
+- Depois de instalado, o handler continua instalado até `Signal` ser chamado com `SIG_IGN` ou `SIG_DFL`.
+
+### Sincronizando fluxos para evitar bugs de concorrência
+
+Programar fluxos concorrentes que leem e escrevem nas mesmas posições de memória é um desafio antigo da computação. Em geral, o número de intercalações possíveis entre os fluxos cresce exponencialmente com o número de instruções. Algumas intercalações dão a resposta certa e outras não, e o problema é **sincronizar** os fluxos para permitir o maior conjunto possível de intercalações que sempre dê a resposta certa.
+
+O programa abaixo tem a estrutura típica de um shell. O pai acompanha os filhos atuais em uma **lista de jobs** global, com uma entrada por job, e as funções `addjob` e `deletejob` acrescentam e removem entradas. Depois de criar um filho, o pai o acrescenta à lista. Quando colhe um filho no handler de `SIGCHLD`, o remove da lista:
+
+```c
+/* WARNING: This code is buggy! */
+void handler(int sig)
+{
+    int olderrno = errno;
+    sigset_t mask_all, prev_all;
+    pid_t pid;
+
+    Sigfillset(&mask_all);
+    while ((pid = waitpid(-1, NULL, 0)) > 0) { /* Reap a zombie child */
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(pid); /* Delete the child from the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
+    if (errno != ECHILD)
+        Sio_error("waitpid error");
+    errno = olderrno;
+}
+
+int main(int argc, char **argv)
+{
+    int pid;
+    sigset_t mask_all, prev_all;
+
+    Sigfillset(&mask_all);
+    Signal(SIGCHLD, handler);
+    initjobs(); /* Initialize the job list */
+
+    while (1) {
+        if ((pid = Fork()) == 0) { /* Child process */
+            Execve("/bin/date", argv, NULL);
+        }
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all); /* Parent process */
+        addjob(pid); /* Add the child to the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
+    exit(0);
+}
+```
+
+À primeira vista parece correto, mas esta sequência de eventos é possível:
+
+1. O pai executa o `fork`, e o kernel escalona o filho recém-criado em vez do pai.
+2. Antes de o pai voltar a rodar, o filho termina e vira zumbi, e o kernel entrega um `SIGCHLD` ao pai.
+3. Quando o pai vai voltar a rodar, o kernel vê o `SIGCHLD` pendente e roda o handler no pai.
+4. O handler colhe o filho e chama `deletejob`, que não faz nada, porque o pai ainda não acrescentou o filho à lista.
+5. Depois do handler, o pai volta do `fork` e acrescenta o filho (que já não existe) à lista com `addjob`.
+
+Ou seja, em algumas intercalações o `deletejob` é chamado antes do `addjob`, e a lista fica com uma entrada de um job que não existe mais e nunca vai ser removida. Em outras intercalações, a ordem é a certa. Esse é um erro clássico de sincronização chamado **condição de corrida** (*race*): aqui, a corrida é entre o `addjob` na `main` e o `deletejob` no handler. Se o `addjob` ganha, o resultado está certo. Se perde, está errado. Esses erros são muito difíceis de depurar, porque é impossível testar todas as intercalações: o código pode rodar um bilhão de vezes sem problema e falhar na próxima.
+
+Uma forma de eliminar a corrida é **bloquear o `SIGCHLD` antes do `fork`** e só desbloquear depois do `addjob`. Assim, o filho só pode ser colhido depois de entrar na lista. Como os filhos herdam o conjunto de sinais bloqueados do pai, é preciso desbloquear o `SIGCHLD` no filho antes do `execve`:
+
+```c
+void handler(int sig)
+{
+    int olderrno = errno;
+    sigset_t mask_all, prev_all;
+    pid_t pid;
+
+    Sigfillset(&mask_all);
+    while ((pid = waitpid(-1, NULL, 0)) > 0) { /* Reap a zombie child */
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(pid); /* Delete the child from the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
+    if (errno != ECHILD)
+        Sio_error("waitpid error");
+    errno = olderrno;
+}
+
+int main(int argc, char **argv)
+{
+    int pid;
+    sigset_t mask_all, mask_one, prev_one;
+
+    Sigfillset(&mask_all);
+    Sigemptyset(&mask_one);
+    Sigaddset(&mask_one, SIGCHLD);
+    Signal(SIGCHLD, handler);
+    initjobs(); /* Initialize the job list */
+
+    while (1) {
+        Sigprocmask(SIG_BLOCK, &mask_one, &prev_one); /* Block SIGCHLD */
+        if ((pid = Fork()) == 0) { /* Child process */
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL); /* Unblock SIGCHLD */
+            Execve("/bin/date", argv, NULL);
+        }
+        Sigprocmask(SIG_BLOCK, &mask_all, NULL); /* Parent process */
+        addjob(pid); /* Add the child to the job list */
+        Sigprocmask(SIG_SETMASK, &prev_one, NULL); /* Unblock SIGCHLD */
+    }
+    exit(0);
+}
+```
+
+### Esperando sinais explicitamente
+
+Às vezes o programa principal precisa esperar um certo handler rodar. Por exemplo, quando um shell cria um job em primeiro plano, ele precisa esperar o job terminar e ser colhido pelo handler de `SIGCHLD` antes de aceitar o próximo comando.
+
+No programa abaixo, o pai instala handlers para `SIGINT` e `SIGCHLD` e entra em um loop infinito. Ele bloqueia o `SIGCHLD` para evitar a corrida vista antes, cria o filho, zera a variável `pid`, desbloqueia o `SIGCHLD` e fica em um **spin loop** esperando `pid` ficar diferente de zero. Quando o filho termina, o handler o colhe e coloca o PID dele na variável global `pid`, o que encerra o loop:
+
+```c
+#include "csapp.h"
+
+volatile sig_atomic_t pid;
+
+void sigchld_handler(int s)
+{
+    int olderrno = errno;
+    pid = waitpid(-1, NULL, 0);
+    errno = olderrno;
+}
+
+void sigint_handler(int s)
+{
+}
+
+int main(int argc, char **argv)
+{
+    sigset_t mask, prev;
+
+    Signal(SIGCHLD, sigchld_handler);
+    Signal(SIGINT, sigint_handler);
+    Sigemptyset(&mask);
+    Sigaddset(&mask, SIGCHLD);
+
+    while (1) {
+        Sigprocmask(SIG_BLOCK, &mask, &prev); /* Block SIGCHLD */
+        if (Fork() == 0) /* Child */
+            exit(0);
+
+        /* Parent */
+        pid = 0;
+        Sigprocmask(SIG_SETMASK, &prev, NULL); /* Unblock SIGCHLD */
+
+        /* Wait for SIGCHLD to be received (wasteful) */
+        while (!pid)
+            ;
+
+        /* Do some work after receiving SIGCHLD */
+        printf(".");
+    }
+    exit(0);
+}
+```
+
+O código está correto, mas o spin loop **desperdiça processador**. Colocar um `pause` dentro do loop parece uma solução:
+
+```c
+while (!pid)  /* Race! */
+    pause();
+```
+
+O loop continua necessário porque o `pause` pode ser interrompido por um `SIGINT`. Mas esse código tem uma **condição de corrida** séria: se o `SIGCHLD` chegar depois do teste do `while` e antes do `pause`, o `pause` dorme para sempre. Trocar o `pause` por `sleep` funciona, mas é lento demais: se o sinal chegar entre o `while` e o `sleep`, o programa espera um tempo relativamente longo até testar de novo. Usar um `sleep` mais preciso, como o `nanosleep`, também não resolve, porque não existe um bom intervalo: pequeno demais desperdiça processador, e grande demais deixa o programa lento.
+
+```c
+while (!pid) /* Too slow! */
+    sleep(1);
+```
+
+A solução certa é a função **`sigsuspend`**:
+
+```c
+#include <signal.h>
+
+int sigsuspend(const sigset_t *mask);
+```
+
+Ela troca temporariamente o conjunto de bloqueados por `mask` e suspende o processo até receber um sinal cuja ação seja rodar um handler ou terminar o processo. Se a ação for terminar, o processo termina sem voltar do `sigsuspend`. Se for rodar um handler, o `sigsuspend` retorna depois do handler e restaura o conjunto de bloqueados que existia antes da chamada. Ela equivale a uma versão **atômica** (que não pode ser interrompida) deste trecho:
+
+```c
+sigprocmask(SIG_BLOCK, &mask, &prev);
+pause();
+sigprocmask(SIG_SETMASK, &prev, NULL);
+```
+
+Por ser atômica, o `sigprocmask` e o `pause` acontecem juntos, sem que um sinal possa chegar entre os dois, o que elimina a corrida. Com o `sigsuspend`, o spin loop fica assim:
+
+```c
+#include "csapp.h"
+
+volatile sig_atomic_t pid;
+
+void sigchld_handler(int s)
+{
+    int olderrno = errno;
+    pid = Waitpid(-1, NULL, 0);
+    errno = olderrno;
+}
+
+void sigint_handler(int s)
+{
+}
+
+int main(int argc, char **argv)
+{
+    sigset_t mask, prev;
+
+    Signal(SIGCHLD, sigchld_handler);
+    Signal(SIGINT, sigint_handler);
+    Sigemptyset(&mask);
+    Sigaddset(&mask, SIGCHLD);
+
+    while (1) {
+        Sigprocmask(SIG_BLOCK, &mask, &prev); /* Block SIGCHLD */
+        if (Fork() == 0) /* Child */
+            exit(0);
+
+        /* Wait for SIGCHLD to be received */
+        pid = 0;
+        while (!pid)
+            sigsuspend(&prev);
+
+        /* Optionally unblock SIGCHLD */
+        Sigprocmask(SIG_SETMASK, &prev, NULL);
+
+        /* Do some work after receiving SIGCHLD */
+        printf(".");
+    }
+    exit(0);
+}
+```
+
+Antes de cada `sigsuspend`, o `SIGCHLD` está bloqueado. O `sigsuspend` o desbloqueia temporariamente e dorme até o pai capturar um sinal. Antes de retornar, restaura o conjunto original, bloqueando o `SIGCHLD` de novo. Se o pai capturou um `SIGINT`, o teste do loop dá verdadeiro e o `sigsuspend` é chamado de novo. Se capturou um `SIGCHLD`, o loop termina. Nesse ponto o `SIGCHLD` está bloqueado, e dá para desbloqueá-lo se for preciso, o que seria útil em um shell de verdade com jobs em segundo plano para colher. Essa versão não desperdiça processador como o spin loop, não tem a corrida do `pause` e é mais eficiente que o `sleep`.
+
+## Saltos não locais
+
+O C oferece uma forma de ECF no nível do usuário chamada **salto não local** (*nonlocal jump*), que transfere o controle diretamente de uma função para outra que está em execução, **sem passar pela sequência normal de chamada e retorno**. Os saltos não locais são feitos com as funções `setjmp` e `longjmp`:
+
+```c
+#include <setjmp.h>
+
+int setjmp(jmp_buf env);
+int sigsetjmp(sigjmp_buf env, int savesigs);
+
+void longjmp(jmp_buf env, int retval);
+void siglongjmp(sigjmp_buf env, int retval);
+```
+
+- **`setjmp`** guarda o **ambiente de chamada** atual no buffer `env`, para ser usado depois pelo `longjmp`, e retorna 0. O ambiente de chamada inclui o program counter, o stack pointer e os registradores de uso geral. Por motivos sutis, o valor de retorno do `setjmp` não deve ser atribuído a uma variável (`rc = setjmp(env);` está errado), mas pode ser usado como teste em um `switch` ou em um `if`.
+- **`longjmp`** restaura o ambiente de chamada guardado em `env` e faz o `setjmp` mais recente que preencheu `env` **retornar de novo**, agora com o valor diferente de zero `retval`.
+
+A interação entre os dois confunde no começo: **o `setjmp` é chamado uma vez, mas retorna várias**, uma quando é chamado e guarda o ambiente, e outra para cada `longjmp` correspondente. Já **o `longjmp` é chamado uma vez e nunca retorna**.
+
+Um uso importante dos saltos não locais é **sair na hora de uma chamada de função muito aninhada**, normalmente ao detectar um erro. Em vez de desfazer a pilha de chamadas uma por uma, dá para saltar direto para um tratador de erros comum. No exemplo abaixo, a `main` chama `setjmp` para guardar o ambiente e depois chama `foo`, que chama `bar`. Se `foo` ou `bar` encontram um erro, voltam direto para o `setjmp` com um `longjmp`, e o valor de retorno do `setjmp` diz qual foi o erro, que é tratado em um único lugar:
+
+```c
+#include "csapp.h"
+
+jmp_buf buf;
+
+int error1 = 0;
+int error2 = 1;
+
+void foo(void), bar(void);
+
+int main()
+{
+    switch(setjmp(buf)) {
+    case 0:
+        foo();
+        break;
+    case 1:
+        printf("Detected an error1 condition in foo\n");
+        break;
+    case 2:
+        printf("Detected an error2 condition in foo\n");
+        break;
+    default:
+        printf("Unknown error condition in foo\n");
+    }
+    exit(0);
+}
+
+/* Deeply nested function foo */
+void foo(void)
+{
+    if (error1)
+        longjmp(buf, 1);
+    bar();
+}
+
+void bar(void)
+{
+    if (error2)
+        longjmp(buf, 2);
+}
+```
+
+Pular todas as chamadas intermediárias pode ter consequências inesperadas. Se alguma função intermediária alocou estruturas de dados para liberar no fim, o código que libera é pulado, e a memória **vaza**.
+
+Outro uso importante é **sair de um signal handler para um ponto específico do código**, em vez de voltar para a instrução que foi interrompida pelo sinal. O programa abaixo usa sinais e saltos não locais para **reiniciar** sempre que o usuário digita `Ctrl+C`. As funções `sigsetjmp` e `siglongjmp` são versões de `setjmp` e `longjmp` que podem ser usadas por signal handlers:
+
+```c
+#include "csapp.h"
+
+sigjmp_buf buf;
+
+void handler(int sig)
+{
+    siglongjmp(buf, 1);
+}
+
+int main()
+{
+    if (!sigsetjmp(buf, 1)) {
+        Signal(SIGINT, handler);
+        Sio_puts("starting\n");
+    }
+    else
+        Sio_puts("restarting\n");
+
+    while(1) {
+        Sleep(1);
+        Sio_puts("processing...\n");
+    }
+    exit(0); /* Control never reaches here */
+}
+```
+
+A primeira chamada ao `sigsetjmp` guarda o ambiente de chamada e o contexto de sinais (incluindo os vetores `pending` e `blocked`) quando o programa começa. Depois, a `main` entra no loop de processamento. Quando o usuário digita `Ctrl+C`, o kernel envia um `SIGINT`, que o processo captura. Em vez de retornar do handler, o que devolveria o controle para o loop interrompido, o handler faz um salto não local de volta para o começo da `main`:
+
+```
+linux> ./restart
+starting
+processing...
+processing...
+Ctrl+C
+restarting
+processing...
+Ctrl+C
+restarting
+processing...
+```
+
+Dois detalhes desse programa:
+
+- **O handler é instalado depois do `sigsetjmp`** para evitar uma corrida. Se fosse antes, o handler poderia rodar antes de o `sigsetjmp` preparar o ambiente para o `siglongjmp`.
+- **`sigsetjmp` e `siglongjmp` não estão na lista de funções async-signal-safe.** Como o `siglongjmp` pode saltar para qualquer código, é preciso chamar só funções seguras em todo código alcançável a partir dele. No exemplo, só são chamadas `sio_puts` e `sleep`, que são seguras, e o `exit`, que não é, nunca é alcançado.
+
+> **Exceções de software em C++ e Java.** Os mecanismos de exceção de C++ e Java são versões de mais alto nível e mais estruturadas do `setjmp` e do `longjmp`. Dá para pensar no `catch` dentro de um `try` como algo parecido com um `setjmp`, e no `throw` como algo parecido com um `longjmp`.
+
+## Ferramentas para manipular processos
+
+O Linux tem várias ferramentas úteis para acompanhar e manipular processos:
+
+- **`strace`:** mostra cada system call feita por um programa em execução e pelos seus filhos. Compilar o programa com `-static` deixa a saída mais limpa, sem as chamadas relacionadas às shared libraries.
+- **`ps`:** lista os processos que estão no sistema, incluindo os zumbis.
+- **`top`:** mostra o uso de recursos dos processos atuais.
+- **`pmap`:** mostra o mapa de memória de um processo.
+- **`/proc`:** um sistema de arquivos virtual que exporta o conteúdo de várias estruturas de dados do kernel em texto, que os programas do usuário podem ler. Por exemplo, `cat /proc/loadavg` mostra a carga média atual do sistema.
+
+## Resumo
+
+- **Exceptional control flow (ECF):** mudanças bruscas no fluxo de controle que acontecem em todos os níveis do sistema e são a base da concorrência.
+- **Exceções:** no nível do hardware, um evento no processador transfere o controle para um **exception handler**, encontrado pela **tabela de exceções**, que trata o evento e pode devolver o controle ao programa interrompido. O handler roda em modo kernel.
+- **As quatro classes de exceções:**
+  - **Interrupções:** assíncronas, vêm de dispositivos de I/O (como o timer ou a controladora de disco) e voltam para a próxima instrução.
+  - **Traps:** intencionais, usadas para as **system calls**, que dão aos programas pontos de entrada controlados no kernel.
+  - **Faults:** erros possivelmente recuperáveis, como a page fault. O handler corrige o erro e executa a instrução de novo, ou aborta o programa.
+  - **Aborts:** erros fatais de hardware, que nunca voltam para o programa.
+- **Processo:** uma instância de um programa em execução. O kernel usa ECF para oferecer duas ilusões: um **fluxo de controle lógico**, como se o programa tivesse o processador só para ele, e um **espaço de endereçamento privado**, como se tivesse a memória só para ele. O kernel alterna entre processos com **trocas de contexto**, e um processo só passa do **modo usuário** para o **modo kernel** por meio de uma exceção.
+- **Tratamento de erros:** as funções de sistema retornam −1 e colocam o código do erro em `errno`. Os wrappers com a primeira letra maiúscula (`Fork`, `Signal`) verificam o erro e encerram o programa.
+- **Controle de processos:**
+  - `fork` cria um filho e **retorna duas vezes**: 0 no filho e o PID do filho no pai.
+  - `exit` termina o processo.
+  - `waitpid` espera um filho e o **colhe**. Um filho terminado e não colhido é um **zumbi**.
+  - `execve` carrega e roda um novo programa no processo atual e **nunca retorna**. O kernel copia os argumentos e as variáveis de ambiente para o fundo da pilha nova, onde a `main` os encontra por meio de `argv` e `envp`.
+  - Um shell é basicamente um loop de `fork`, `execve` e `waitpid`.
+- **Sinais:** mensagens que avisam um processo de que um evento aconteceu (`SIGINT` no `Ctrl+C`, `SIGCHLD` quando um filho termina, `SIGSEGV` em um acesso inválido à memória). São enviados com `kill` ou pelo teclado, para processos ou grupos, e podem ser ignorados, ter a ação padrão ou ser capturados por um **signal handler**.
+- **Sinais não entram em fila:** só existe um sinal pendente de cada tipo, então um handler de `SIGCHLD` precisa colher todos os zumbis que conseguir.
+- **Handlers seguros:** handlers rodam concorrentemente com o programa. Eles devem ser simples, chamar só funções async-signal-safe, salvar o `errno`, bloquear sinais ao mexer em dados compartilhados e usar `volatile` e `sig_atomic_t`.
+- **Sincronização:** condições de corrida entre o programa e os handlers são evitadas bloqueando sinais com `sigprocmask`. Para esperar um sinal sem desperdiçar processador e sem corrida, o certo é o `sigsuspend`.
+- **Saltos não locais:** `setjmp` guarda o ambiente de chamada e `longjmp` volta para ele, pulando a disciplina normal de chamada e retorno. Servem para tratar erros em funções muito aninhadas e para sair de signal handlers. São a base das exceções de C++ e Java.
+- **Ferramentas:** `strace`, `ps`, `top`, `pmap` e `/proc`.
 
 ---
 
