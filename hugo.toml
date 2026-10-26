@@ -29,6 +29,7 @@ theme = 'hextra'
     sortBy = "date"
     sortOrder = "desc"
     displayTags = true
+    pagerSize = 1000
 
   [params.blog.article]
     displayPagination = true
