@@ -3,7 +3,7 @@ date = '2026-10-22T22:59:03-03:00'
 draft = false
 title = 'Linking'
 type = 'blog'
-tags = ['Arquitetura', 'Sistemas Operacionais', 'Bibliotecas', 'Compiladores']
+tags = ['Arquitetura', 'Sistemas Operacionais', 'Compiladores', 'C', 'CSAPP']
 +++
 
 *Linking* (ligação) é o processo de reunir e combinar vários pedaços de código e de dados em um único arquivo, que pode ser *carregado* (copiado) para a memória e executado. O linking pode acontecer em três momentos:

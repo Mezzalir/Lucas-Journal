@@ -3,7 +3,7 @@ date = '2026-09-20T17:04:49-03:00'
 draft = false
 title = 'Olá, Mundo!'
 type = 'blog'
-tags = ['unioeste']
+tags = ['Unioeste']
 +++
 
 Este é o meu primeiro post do meu blog e o título não poderia ser outro!

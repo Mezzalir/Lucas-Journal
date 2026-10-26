@@ -3,7 +3,7 @@ date = '2026-10-22T20:34:51-03:00'
 draft = false
 title = 'Representando e Manipulando Informação'
 type = 'blog'
-tags = ['Arquitetura', 'Informação']
+tags = ['Arquitetura', 'C', 'CSAPP']
 +++
 
 Computadores guardam e processam tudo como bits, sinais de dois valores. Um bit sozinho não diz muito, mas um grupo de bits com uma interpretação pode representar qualquer coisa: números, letras, instruções. Existem três representações de números que importam mais:

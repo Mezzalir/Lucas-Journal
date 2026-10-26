@@ -3,7 +3,7 @@ date = '2026-10-26T16:25:59-03:00'
 draft = false
 title = 'Exceptional Control Flow'
 type = 'blog'
-tags = ['Arquitetura', 'Sistemas Operacionais', 'CSAPP']
+tags = ['Arquitetura', 'Sistemas Operacionais', 'Concorrência', 'C', 'CSAPP']
 +++
 
 Do momento em que o computador é ligado até o momento em que é desligado, o *program counter* (PC) assume uma sequência de valores, cada um sendo o endereço de uma instrução. A passagem de um endereço para o próximo é chamada de **transferência de controle**, e a sequência inteira dessas transferências é o **fluxo de controle** (*control flow*) do processador.

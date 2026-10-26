@@ -3,7 +3,7 @@ date = '2026-10-22T18:40:00-03:00'
 draft = true
 title = 'Otimizando o Desempenho de Programas'
 type = 'blog'
-tags = ['Arquitetura', 'CSAPP']
+tags = ['Arquitetura', 'Desempenho', 'Compiladores', 'C', 'CSAPP']
 +++
 
 Compiladores modernos, como o GCC, aplicam várias otimizações no código. O nível é escolhido na compilação: `-Og` aplica só otimizações básicas, enquanto `-O1`, `-O2` e `-O3` aplicam otimizações cada vez mais agressivas. Mas existe uma regra que o compilador nunca quebra: ele só pode fazer otimizações **seguras**. O programa otimizado precisa se comportar exatamente igual ao original em todos os casos possíveis, mesmo nos que parecem improváveis. Por isso, o compilador às vezes deixa de fazer uma otimização que parece óbvia para o programador. Esses obstáculos são chamados de *optimization blockers*.

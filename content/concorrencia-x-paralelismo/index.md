@@ -3,7 +3,7 @@ date = '2026-10-14T13:49:39-03:00'
 draft = false
 title = 'Concorrência x Paralelismo'
 type = 'blog'
-tags = ['Arquitetura', 'História']
+tags = ['Arquitetura', 'Concorrência', 'História']
 +++
 
 ## Resumo

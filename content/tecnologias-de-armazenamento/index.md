@@ -3,7 +3,7 @@ date = '2026-10-22T20:14:20-03:00'
 draft = false
 title = 'Tecnologias de Armazenamento'
 type = 'blog'
-tags = ['Arquitetura', 'Armazenamento']
+tags = ['Arquitetura', 'Memória', 'CSAPP']
 +++
 
 Todo sistema de computação guarda dados em várias tecnologias diferentes, cada uma com um equilíbrio próprio entre velocidade, capacidade e custo. Este post resume as principais: as memórias de acesso aleatório (SRAM e DRAM), as memórias não voláteis (ROM, PROM, EPROM, EEPROM e flash), os discos, os SSDs e, por fim, como as memórias cache são organizadas e como escrever código que tire proveito delas.

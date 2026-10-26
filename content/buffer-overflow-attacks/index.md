@@ -3,7 +3,7 @@ date = '2026-10-20T20:53:39-03:00'
 draft = false
 title = 'Buffer Overflow Attacks'
 type = 'blog'
-tags = ['Segurança', 'Arquitetura', 'CSAPP']
+tags = ['Arquitetura', 'Segurança', 'Assembly', 'Memória', 'C', 'CSAPP']
 +++
 
 Buffer overflow é uma das vulnerabilidades mais antigas e mais exploradas da computação. Ela acontece quando um programa escreve num array (o *buffer*) mais bytes do que ele comporta. Os bytes que sobram não são descartados: são gravados nas posições de memória logo depois do array, apagando o que estava lá.

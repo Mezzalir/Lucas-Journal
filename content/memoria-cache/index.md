@@ -3,7 +3,7 @@ date = '2026-10-22T18:13:37-03:00'
 draft = false
 title = 'Memória Cache'
 type = 'blog'
-tags = ['Arquitetura']
+tags = ['Arquitetura', 'Memória']
 +++
 
 ## Resumo

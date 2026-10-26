@@ -3,7 +3,7 @@ date = '2026-10-20T20:39:26-03:00'
 draft = false
 title = 'The Mythical Man-Month'
 type = 'blog'
-tags = ['Engenharia de software']
+tags = ['Engenharia de Software']
 +++
 
 *The Mythical Man-Month*, de Frederick P. Brooks Jr., foi publicado em 1975 a partir da experiência do autor gerenciando o desenvolvimento do sistema operacional OS/360 da IBM. Quase cinquenta anos depois, continua sendo um dos livros mais citados da engenharia de software, justamente porque os problemas que ele descreve são menos sobre tecnologia e mais sobre pessoas, organização e a natureza do próprio software. Aqui estão cinco das ideias centrais do livro.

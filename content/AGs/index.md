@@ -3,7 +3,7 @@ date = '2026-09-21T10:17:29-03:00'
 draft = false
 title = 'Algoritmos genéticos'
 type = 'blog'
-tags = ['unioeste', 'otimização']
+tags = ['Unioeste', 'Algoritmos']
 +++
 
 ## Primeiro de tudo
