@@ -1,7 +1,7 @@
 +++
 date = '2026-10-28T12:00:00-03:00'
 draft = false
-title = 'Unix e Linux'
+title = 'Unix e o projeto GNU/Linux'
 type = 'blog'
 tags = ['História da computação', 'Linux', 'Sistemas Operacionais']
 +++
@@ -175,6 +175,30 @@ A disputa pela herança do Unix ainda teve um último capítulo nos tribunais. E
 | 1994 | Linux 1.0; 4.4BSD-Lite encerra o processo |
 | 1996 | X/Open e OSF formam o The Open Group |
 | 2017 | Linux passa a rodar em todos os supercomputadores do TOP500 |
+
+## O que as distribuições têm em comum e o que muda entre elas
+
+Existem centenas de distribuições, mas por baixo elas compartilham a mesma base. A única peça que **toda** distribuição Linux tem é o **kernel Linux**, que gerencia o processador, a memória, os processos, os drivers e os sistemas de arquivos. A versão e a configuração do kernel variam, mas ele é sempre o Linux.
+
+As distribuições **GNU/Linux**, que são a grande maioria (Debian, Ubuntu, Fedora, Arch, openSUSE...), também têm em comum:
+
+- **o userland GNU**: a biblioteca C **glibc**, usada por quase todos os programas; os utilitários do **coreutils** (`ls`, `cp`, `mv`, `cat`, `chmod`...); o shell **bash**; ferramentas como `grep`, `sed`, `tar` e `find`; e o conjunto de compilação, com **GCC**, `make` e `binutils`;
+- **licenças de software livre**: o kernel e as ferramentas GNU são distribuídos principalmente sob a **GPL**, então o código-fonte está disponível e qualquer pessoa pode estudá-lo, modificá-lo e redistribuí-lo;
+- **a mesma estrutura de diretórios**: quase todas seguem o *Filesystem Hierarchy Standard* (FHS), com `/etc` para configurações, `/home` para os usuários, `/usr` para os programas, `/var` para dados que mudam, como logs, e `/tmp` para arquivos temporários;
+- **o comportamento de um Unix**: seguem o POSIX quase inteiramente, então têm usuários e permissões (`rwx`), processos, sinais, pipes e a ideia de que tudo é arquivo.
+
+O que muda de uma distribuição para outra são as escolhas feitas em cima dessa base:
+
+| Aspecto | Exemplos |
+|---|---|
+| Gerenciador de pacotes | `apt` (Debian, Ubuntu), `dnf` (Fedora, Red Hat), `pacman` (Arch), `zypper` (openSUSE) |
+| Formato dos pacotes | `.deb`, `.rpm`, `.pkg.tar.zst` |
+| Sistema de init | `systemd` (a maioria), `OpenRC` (Gentoo, Alpine), `runit` (Void) |
+| Ambiente gráfico | GNOME, KDE Plasma, XFCE ou gerenciadores de janelas como o Hyprland |
+| Modelo de atualização | *rolling release*, sempre na versão mais nova (Arch, openSUSE Tumbleweed), ou versões fixas lançadas periodicamente (Debian, Ubuntu LTS) |
+| Público e objetivo | estabilidade para servidores (Debian, RHEL), facilidade para iniciantes (Ubuntu, Linux Mint), controle total para quem monta o sistema (Arch, Gentoo) |
+
+Algumas distribuições trocam até a parte que parecia fixa. O **Alpine Linux**, muito usado em contêineres, substitui a glibc pela **musl** e os utilitários GNU pelo **BusyBox**, para ficar pequeno. Assim como o Android, ele é Linux sem ser GNU/Linux. Por isso o kernel é a única coisa que realmente toda distribuição Linux tem em comum.
 
 ## Resumo
 
